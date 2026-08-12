@@ -7,6 +7,6 @@
 
 #include <kernel/drivers/uefi_linear_framebuffer.h>
 
-void kprintf(char *fmtstr, ...);
+void kprintf(const char *fmtstr, ...);
 
 #endif

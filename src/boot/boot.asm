@@ -78,12 +78,36 @@ setup_page_tables:
     or eax, 0x3                 ; Present + Writable
     mov [pml4 - KERNEL_VMA + 511 * 8], eax
 
-    ; Map PDPT_HIGH[510] -> pd0 (Maps 0xFFFFFFFF80000000 -> Physical 0x0)
+    ; Map PDPT_HIGH[510] -> pd0, [511] -> pd1  (covers KERNEL_VMA .. +2GB)
     mov eax, pd0 - KERNEL_VMA
     or eax, 0x3
     mov [pdpt_high - KERNEL_VMA + 510 * 8], eax
+    mov eax, pd1 - KERNEL_VMA
+    or eax, 0x3
+    mov [pdpt_high - KERNEL_VMA + 511 * 8], eax
+
+    ; Direct Map PML4[256] -> PDPT_DM
+    mov eax, pdpt_dm - KERNEL_VMA
+    or eax, 0x3
+    mov [pml4 - KERNEL_VMA + 256 * 8], eax
+
+    ; Map PDPT_DM[0..3] -> pd0..pd3  (direct map covers phys 0 .. 4GB)
+    mov eax, pd0 - KERNEL_VMA
+    or eax, 0x3
+    mov [pdpt_dm - KERNEL_VMA + 0 * 8], eax
+    mov eax, pd1 - KERNEL_VMA
+    or eax, 0x3
+    mov [pdpt_dm - KERNEL_VMA + 1 * 8], eax
+    mov eax, pd2 - KERNEL_VMA
+    or eax, 0x3
+    mov [pdpt_dm - KERNEL_VMA + 2 * 8], eax
+    mov eax, pd3 - KERNEL_VMA
+    or eax, 0x3
+    mov [pdpt_dm - KERNEL_VMA + 3 * 8], eax
 
     ; Map 4GB using 2048 x 2MB Huge Pages
+    ; pd0..pd3 are order contiguously in .data
+    ; so map overflows from pd0 -> pd1..pd3
     mov ecx, 0
 .map_pd:
     mov eax, 0x200000
@@ -165,8 +189,9 @@ dbg_play_beep:
     in al, 0x61
     or al, 0x03
     out 0x61, al
+    ret
 
-section .setup_stack
+section .setup_stack nobits
 align 16
 stack_bottom: resb 16384
 stack_top:
@@ -199,6 +224,7 @@ global pml4
 pml4:      times 4096 db 0
 pdpt:      times 4096 db 0
 pdpt_high: times 4096 db 0
+pdpt_dm:   times 4096 db 0
 pd0:       times 4096 db 0
 pd1:       times 4096 db 0
 pd2:       times 4096 db 0

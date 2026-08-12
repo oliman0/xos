@@ -31,7 +31,7 @@ SECTIONS
         *(.data)
     }
 
-    .setup_stack ALIGN(16) : AT(ADDR(.setup_stack) - KERNEL_VMA) {
+    .setup_stack ALIGN(16) (NOLOAD) : AT(ADDR(.setup_stack) - KERNEL_VMA) {
         *(.setup_stack)
     }
 

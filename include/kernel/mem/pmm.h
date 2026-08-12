@@ -10,6 +10,7 @@
 #define PAGE_SIZE 4096
 
 #define KERNEL_VMA 0xFFFFFFFF80000000ULL
+#define PHYS_ADDR_MASK 0x000FFFFFFFFFF000ULL
 
 // Bitwise helper macros
 // Index / 8 gives the byte. Index % 8 gives the bit inside that byte.

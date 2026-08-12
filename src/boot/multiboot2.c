@@ -4,19 +4,19 @@ multiboot_info_table_t parse_multiboot2_tags(uint64_t multiboot2_info_addr)
 {
     multiboot_info_table_t info_table = {0};
 
-    // 1. Sanity check: Ensure pointer is non-null and 8-byte aligned
+    // Ensure pointer is non-null and 8-byte aligned
     if (!multiboot2_info_addr || (multiboot2_info_addr & 7) != 0) {
         return info_table;
     }
 
-    // 2. Multiboot2 header: First 4 bytes = total_size, next 4 bytes = reserved
+    // Multiboot2 header: First 4 bytes = total_size, next 4 bytes = reserved
     uint32_t total_size = *(uint32_t *)multiboot2_info_addr;
     uint8_t *end_addr = (uint8_t *)multiboot2_info_addr + total_size;
 
-    // 3. Tags start 8 bytes after the base address
+    // Tags start 8 bytes after the base address
     multiboot_tag_t *tag = (multiboot_tag_t *)(multiboot2_info_addr + 8);
 
-    // 4. Safely loop while inside bounds and before MULTIBOOT_TAG_TYPE_END
+    // Safely loop while inside bounds and before MULTIBOOT_TAG_TYPE_END
     while ((uint8_t *)tag < end_addr && tag->type != MULTIBOOT_TAG_TYPE_END)
     {
         // Guard against corrupt tags that would cause an infinite loop

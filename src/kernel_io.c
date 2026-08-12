@@ -1,45 +1,37 @@
 #include <kernel/kernel_io.h>
 
-static void print_number(unsigned int num, unsigned short int base, bool isSigned)
+static void print_number(uint64_t num, unsigned short int base, bool isSigned)
 {
     if (base > 16) return;
 
     const char* digits = "0123456789ABCDEF";
-    char outBuffer[22];
+    char outBuffer[68];
 
-    // If number is signed we check if negative, else false
+
     bool negative = isSigned ? (int)num < 0 : false;
+    if (negative) {
+        num = (uint64_t)(-(int64_t)num);
+    }
 
-    // If negative make positive so that we can print
-    if (negative) num = (int)num * -1;
-
-    // Iterate backwards over each digit of number
     int i = 0;
     do {
-        // Remainder will be current digit, convert to char and store in buffer
         outBuffer[i++] = digits[num % base];
         num /= base;
     } while (num != 0);
 
-    // Prepend negative sign
     if (negative) outBuffer[i++] = '-';
-
-    // Null terminate the string
     outBuffer[i--] = '\0';
 
-    // Reverse string before printing
     for (int j = 0; j < i; j++, i--) {
-        // i starts from the top of the buffer
-        // j starts from bottom
-        char tmp = outBuffer[j]; // Store char at j
-        outBuffer[j] = outBuffer[i]; // Set the char at j to char at i
-        outBuffer[i] = tmp; // Set char i to char at j
+        char tmp = outBuffer[j];
+        outBuffer[j] = outBuffer[i];
+        outBuffer[i] = tmp;
     }
 
     fb_put_str(outBuffer);
 }
 
-void kprintf(char *fmtstr, ...)
+void kprintf(const char *fmtstr, ...)
 {
     va_list args;
     va_start(args, fmtstr);

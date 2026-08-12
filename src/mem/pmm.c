@@ -1,4 +1,5 @@
 #include <kernel/mem/pmm.h>
+#include <kernel/mem/vmm.h>
 
 uint64_t pmm_max_phys_addr = 0;
 
@@ -46,7 +47,7 @@ void pmm_init(uint64_t multiboot2_info_addr, multiboot_tag_mmap_t* mmap_tag)
     // Convert kernel_end to PHYSICAL address for calculations
     uint64_t kernel_end_phys = (uint64_t)&_kernel_end - KERNEL_VMA;
 
-    // Multiboot info address is physical
+    // Multiboot info address is VIRTUAL
     uint64_t mb2_start_phys = multiboot2_info_addr - KERNEL_VMA;
     uint32_t mb2_total_size = *(uint32_t*)multiboot2_info_addr;
     uint64_t mb2_end_phys = mb2_start_phys + mb2_total_size;
@@ -62,8 +63,10 @@ void pmm_init(uint64_t multiboot2_info_addr, multiboot_tag_mmap_t* mmap_tag)
     // Page-align the physical start of the bitmap
     bitmap_start_phys = (bitmap_start_phys + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 
-    // Assign virtual pointer to the CPU so memset works in higher half
-    bitmap = (uint8_t *)(bitmap_start_phys + KERNEL_VMA);
+    // Reach the bitmap through the Direct Map so it is valid regardless of how
+    // large it is (the KERNEL_VMA window is only 2GiB; the direct map is 512GiB
+    // and covers the low 4GiB from boot).
+    bitmap = (uint8_t *)PHYS_TO_VIRT(bitmap_start_phys);
 
     // Initialize all memory to 1s (Reserved / In-Use)
     memset(bitmap, 0xFF, bitmap_size_bytes);

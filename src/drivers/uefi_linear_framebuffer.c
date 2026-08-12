@@ -11,6 +11,9 @@ static uint32_t fg_color, bg_color;
 
 void fb_put_pixel(uint32_t x, uint32_t y, uint32_t color)
 {
+    if (x >= fb_tag->framebuffer_width || y >= fb_tag->framebuffer_height) {
+        return;
+    }
     if (fb_tag->framebuffer_bpp == 32)
     {
         uint32_t *fb = (uint32_t *)(fb_virt_addr + y * fb_tag->framebuffer_pitch);
@@ -92,7 +95,9 @@ void fb_init(multiboot_tag_framebuffer_t* framebuffer_tag) {
 
     fb_virt_addr = PHYS_TO_VIRT(fb_tag->framebuffer_addr);
 
-    uint32_t fb_size = fb_tag->framebuffer_height * fb_tag->framebuffer_pitch;
+    uint64_t fb_size = (uint64_t)fb_tag->framebuffer_height * fb_tag->framebuffer_pitch;
+    // Round up to a full 2MiB page so the last scanlines are always mapped
+    fb_size = (fb_size + HUGE_PAGE_SIZE - 1) & ~((uint64_t)HUGE_PAGE_SIZE - 1);
 
     vmm_map_range(fb_tag->framebuffer_addr, fb_virt_addr, fb_size, PAGE_WRITABLE | PAGE_CACHE_DISABLE);
 
