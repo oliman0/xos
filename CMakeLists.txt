@@ -26,6 +26,8 @@ add_executable(kernel.bin src/boot/boot.asm src/kernel.c
         src/drivers/pic.c
         src/drivers/lapic.c
         src/drivers/acpi.c
+        src/drivers/ps2.c
+        src/drivers/ioapic.c
 )
 
 # Force CMake to disable position-independent code

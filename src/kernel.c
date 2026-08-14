@@ -5,7 +5,9 @@
 #include <kernel/gdt.h>
 #include <kernel/idt.h>
 #include <kernel/drivers/lapic.h>
+#include <kernel/drivers/ioapic.h>
 #include <kernel/drivers/pic.h>
+#include <kernel/drivers/ps2.h>
 #include <kernel/drivers/uefi_linear_framebuffer.h>
 
 extern uint8_t _bss_start[];
@@ -42,13 +44,27 @@ void kernel_main(uint64_t multiboot2_info_addr)
     lapic_init(info_table.acpi_tag);
     kprintf("Done.\n");
 
+    kprintf("Initializing IOAPIC... ");
+    ioapic_init(info_table.acpi_tag);
+    kprintf("Done.\n");
+
     kprintf("Configuring LAPIC timer... ");
     uint32_t ticks_per_ms = get_lapic_ticks_per_ms();
     kprintf("Ticks per ms: %d\n", ticks_per_ms);
     lapic_timer_start_periodic(100, ticks_per_ms, LAPIC_TIMER_VECTOR);
     kprintf("Timer started.\n");
 
-    kprintf("Kernel Booted.");
+    kprintf("Initializing PS/2 Driver... ");
+    if (ps2_init())
+    {
+        kprintf("Done.\n");
+    }
+    else
+    {
+        kprintf("Failed.\n");
+    }
+
+    kprintf("Kernel Booted.\n");
 
     while (1)
     {
