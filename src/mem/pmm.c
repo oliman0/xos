@@ -1,3 +1,4 @@
+#include <kernel/lib/string.h>
 #include <kernel/mem/pmm.h>
 #include <kernel/mem/vmm.h>
 
@@ -60,7 +61,8 @@ void pmm_init(uint64_t multiboot2_info_addr, multiboot_tag_mmap_t* mmap_tag)
         uint64_t entry_addr = (uint64_t)mmap_tag->entries + (i * mmap_tag->entry_size);
         multiboot_mmap_entry_t *entry = (multiboot_mmap_entry_t *)entry_addr;
 
-        if (entry->type == MULTIBOOT_MEMORY_AVAILABLE) {
+        if (entry->type == MULTIBOOT_MEMORY_AVAILABLE)
+        {
             pmm_free_region(entry->addr, entry->len);
         }
     }
@@ -72,29 +74,36 @@ void pmm_init(uint64_t multiboot2_info_addr, multiboot_tag_mmap_t* mmap_tag)
     pmm_max_phys_addr = max_addr;
 }
 
-void pmm_free_region(uint64_t base_addr, uint64_t size) {
+void pmm_free_region(uint64_t base_addr, uint64_t size)
+{
     // Ensure we start on a 4KB aligned boundary
     uint64_t start_frame = (base_addr + PAGE_SIZE - 1) / PAGE_SIZE;
     uint64_t end_frame = (base_addr + size) / PAGE_SIZE;
 
-    for (uint64_t i = start_frame; i < end_frame; i++) {
-        BITMAP_CLEAR(i); // 0 means FREE
+    for (uint64_t i = start_frame; i < end_frame; i++)
+    {
+        BITMAP_CLEAR(i);
     }
 }
 
 static uint64_t last_alloc_index = 0;
 
-void* pmm_alloc_frame() {
-    for (uint64_t i = last_alloc_index; i < total_frames; i++) {
-        if (!BITMAP_TEST(i)) {
+void* pmm_alloc_frame()
+{
+    for (uint64_t i = last_alloc_index; i < total_frames; i++)
+    {
+        if (!BITMAP_TEST(i))
+        {
             BITMAP_SET(i);
             last_alloc_index = i;
             return (void*)(i * PAGE_SIZE);
         }
     }
 
-    for (uint64_t i = 0; i < last_alloc_index; i++) {
-        if (!BITMAP_TEST(i)) {
+    for (uint64_t i = 0; i < last_alloc_index; i++)
+    {
+        if (!BITMAP_TEST(i))
+        {
             BITMAP_SET(i);
             last_alloc_index = i;
             return (void*)(i * PAGE_SIZE);
@@ -104,14 +113,17 @@ void* pmm_alloc_frame() {
     return NULL;
 }
 
-void pmm_free_frame(uint64_t physical_addr) {
+void pmm_free_frame(uint64_t physical_addr)
+{
     uint64_t frame_index = physical_addr / PAGE_SIZE;
 
-    if (frame_index < total_frames) {
+    if (frame_index < total_frames)
+    {
         BITMAP_CLEAR(frame_index);
 
         // Optimization: move our search hint backwards if we freed lower memory
-        if (frame_index < last_alloc_index) {
+        if (frame_index < last_alloc_index)
+        {
             last_alloc_index = frame_index;
         }
     }
@@ -135,7 +147,8 @@ void pmm_reserve_region(uint64_t start_addr, uint64_t size)
     // Round up to the nearest frame boundary for the end address
     uint64_t end_frame = (start_addr + size + PAGE_SIZE - 1) / PAGE_SIZE;
 
-    for (uint64_t i = start_frame; i < end_frame; i++) {
+    for (uint64_t i = start_frame; i < end_frame; i++)
+    {
         BITMAP_SET(i);
     }
 }

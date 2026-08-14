@@ -8,7 +8,8 @@ extern void load_tss(void);
 static gdt_entry_t gdt[7] __attribute__((aligned(16)));
 static gdt_ptr_t   gdt_p;
 
-void gdt_set_entry(int num, uint32_t base, uint32_t limit, uint8_t access, uint8_t flags) {
+void gdt_set_entry(int num, uint32_t base, uint32_t limit, uint8_t access, uint8_t flags)
+{
     gdt[num].base_low    = (base & 0xFFFF);
     gdt[num].base_middle = (base >> 16) & 0xFF;
     gdt[num].base_high   = (base >> 24) & 0xFF;
@@ -19,7 +20,8 @@ void gdt_set_entry(int num, uint32_t base, uint32_t limit, uint8_t access, uint8
     gdt[num].access      = access;
 }
 
-void gdt_set_tss(int num, uint64_t base, uint32_t limit) {
+void gdt_set_tss(int num, uint64_t base, uint32_t limit)
+{
     // Fill lower 8 bytes (Standard structure with access 0x89 = Present, Ring 0, TSS Available)
     gdt_set_entry(num, (uint32_t)base, limit, 0x89, 0x00);
 
@@ -29,7 +31,8 @@ void gdt_set_tss(int num, uint64_t base, uint32_t limit) {
     tss_slot->reserved   = 0;
 }
 
-void gdt_init() {
+void gdt_init()
+{
     // Null descriptor
     gdt_set_entry(0, 0, 0, 0, 0);
 

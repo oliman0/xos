@@ -1,25 +1,30 @@
 #include <kernel/panic.h>
 #include <kernel/kernel_io.h>
+#include <kernel/drivers/uefi_linear_framebuffer.h>
 
-static inline uint64_t read_cr0(void) {
+static inline uint64_t read_cr0(void)
+{
     uint64_t val;
     __asm__ volatile ("mov %%cr0, %0" : "=r"(val));
     return val;
 }
 
-static inline uint64_t read_cr2(void) {
+static inline uint64_t read_cr2(void)
+{
     uint64_t val;
     __asm__ volatile ("mov %%cr2, %0" : "=r"(val));
     return val;
 }
 
-static inline uint64_t read_cr3(void) {
+static inline uint64_t read_cr3(void)
+{
     uint64_t val;
     __asm__ volatile ("mov %%cr3, %0" : "=r"(val));
     return val;
 }
 
-void kernel_panic(const char* message, registers_t* regs) {
+void kernel_panic(const char* message, registers_t* regs)
+{
     fb_clear(0);
     fb_set_front_color(0xFF6B6B);
 
@@ -31,7 +36,8 @@ void kernel_panic(const char* message, registers_t* regs) {
     kprintf("============================================================\n");
     kprintf("Reason: %s\n\n", message ? message : "Unspecified Fault");
 
-    if (regs) {
+    if (regs)
+    {
         kprintf("--- Execution Frame ---\n");
         kprintf("Vector    : %x (%d)\n", regs->vector, regs->vector);
         kprintf("Error Code: %x\n", regs->error_code);
@@ -55,7 +61,8 @@ void kernel_panic(const char* message, registers_t* regs) {
     kprintf("CR0: %x  CR2: %x  CR3: %x\n", cr0, cr2, cr3);
     kprintf("============================================================\n");
 
-    while (1) {
+    while (1)
+    {
         __asm__ volatile ("hlt");
     }
 }

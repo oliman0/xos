@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-typedef struct __attribute__((packed)) {
+typedef struct __attribute__((packed))
+{
     char signature[4];
     uint32_t length;
     uint8_t revision;
@@ -15,7 +16,8 @@ typedef struct __attribute__((packed)) {
     uint32_t creator_revision;
 } acpi_header_t;
 
-typedef struct __attribute__((packed)) {
+typedef struct __attribute__((packed))
+{
     char     signature[8];
     uint8_t  checksum;
     char     oem_id[6];
@@ -27,17 +29,20 @@ typedef struct __attribute__((packed)) {
     uint8_t  reserved[3];
 } rsdp_descriptor_20_t;
 
-typedef struct __attribute__((packed)) {
+typedef struct __attribute__((packed))
+{
     acpi_header_t header;
     uint32_t entry[];
 } acpi_rsdt_t;
 
-typedef struct __attribute__((packed)) {
+typedef struct __attribute__((packed))
+{
     acpi_header_t header;
     uint64_t entry[];
 } acpi_xsdt_t;
 
-typedef struct __attribute__((packed)) {
+typedef struct __attribute__((packed))
+{
     acpi_header_t header; // Signature: "HPET"
     uint32_t event_timer_block_id;
     struct {

@@ -10,7 +10,8 @@
 #define ICW1_ICW4    0x01
 #define ICW4_8086    0x01
 
-void pic_disable() {
+void pic_disable()
+{
     outb(PIC1_COMMAND, ICW1_INIT | ICW1_ICW4);
     io_wait();
     outb(PIC2_COMMAND, ICW1_INIT | ICW1_ICW4);

@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <kernel/idt.h>
 #include <kernel/kernel_io.h>
 #include <kernel/panic.h>
@@ -8,7 +9,8 @@ static idtr_t      idtr;
 
 extern void* isr_stub_table[256];
 
-static void idt_set_entry(uint8_t num, uint64_t isr_stub, uint16_t selector, uint8_t flags, uint8_t ist) {
+static void idt_set_entry(uint8_t num, uint64_t isr_stub, uint16_t selector, uint8_t flags, uint8_t ist)
+{
     idt[num].offset_low      = (uint16_t)(isr_stub & 0xFFFF);
     idt[num].selector        = selector;
     idt[num].ist             = ist & 0x07;
@@ -20,21 +22,25 @@ static void idt_set_entry(uint8_t num, uint64_t isr_stub, uint16_t selector, uin
 
 static irq_handler_t irq_handlers[256];
 
-void idt_register_interrupt_handler(uint8_t vector, irq_handler_t handler) {
+void idt_register_interrupt_handler(uint8_t vector, irq_handler_t handler)
+{
     irq_handlers[vector] = handler;
 }
 
-void idt_init() {
+void idt_init()
+{
     idtr.limit = sizeof(idt) - 1;
     idtr.base  = (uint64_t)&idt;
 
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < 256; i++)
+    {
         // 0x8E = Present (0x80) | Ring 0 (0x00) | 64-bit Interrupt Gate (0x0E)
         uint8_t flags = 0x8E;
         uint8_t ist   = 0;
 
         // VECTOR 8: Double Fault (#DF) -> Assign IST1 for dedicated stack switching
-        if (i == 8) {
+        if (i == 8)
+        {
             ist = 1;
         }
 
@@ -75,16 +81,20 @@ static const char* exception_messages[32] = {
     "Reserved (31)"
 };
 
-void isr_handler(registers_t* regs) {
-    if (regs->vector >= 32 && regs->vector < 255) {
-        if (irq_handlers[regs->vector] != NULL) {
+void isr_handler(registers_t* regs)
+{
+    if (regs->vector >= 32 && regs->vector < 255)
+    {
+        if (irq_handlers[regs->vector] != NULL)
+        {
             irq_handlers[regs->vector](regs);
         }
         lapic_eoi();
         return;
     }
 
-    if (regs->vector < 32) {
+    if (regs->vector < 32)
+    {
         kernel_panic(exception_messages[regs->vector], regs);
     }
 }

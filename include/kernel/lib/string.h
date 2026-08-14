@@ -2,7 +2,6 @@
 #define XOS_STRING_H
 
 #include <stddef.h>
-#include <stdint.h>
 
 void* memcpy(void* restrict dest, const void* restrict src, size_t len);
 

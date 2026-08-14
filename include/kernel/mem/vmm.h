@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 
-#include <kernel/mem/pmm.h>
-
 // The virtual base for the Direct Physical Map (PML4 Entry 256)
 #define DIRECT_MAP_BASE 0xFFFF800000000000ULL
 

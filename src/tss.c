@@ -6,7 +6,8 @@ static tss_entry_t tss __attribute__((aligned(16)));
 
 static uint8_t double_fault_stack[DOUBLE_FAULT_STACK_SIZE] __attribute__((aligned(16)));
 
-void tss_init() {
+void tss_init()
+{
     memset(&tss, 0, sizeof(tss));
 
     // Stack for Ring 3 -> Ring 0
@@ -23,6 +24,7 @@ void tss_init() {
     gdt_set_tss(5, (uint64_t)&tss, sizeof(tss) - 1);
 }
 
-void tss_set_rsp0(uint64_t rsp0) {
+void tss_set_rsp0(uint64_t rsp0)
+{
     tss.rsp0 = rsp0;
 }

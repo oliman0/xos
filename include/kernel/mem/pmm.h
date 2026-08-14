@@ -2,10 +2,8 @@
 #define XOS_PMM_H
 
 #include <stdint.h>
-#include <stddef.h>
 
 #include <kernel/boot/multiboot2.h>
-#include <kernel/lib/string.h>
 
 #define PAGE_SIZE 0x1000
 #define HUGE_PAGE_SIZE 0x200000

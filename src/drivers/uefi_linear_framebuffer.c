@@ -1,4 +1,8 @@
+#include <stddef.h>
 #include <kernel/drivers/uefi_linear_framebuffer.h>
+#include <kernel/lib/font.h>
+#include <kernel/mem/pmm.h>
+#include <kernel/mem/vmm.h>
 
 static multiboot_tag_framebuffer_t* fb_tag;
 

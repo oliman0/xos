@@ -11,21 +11,11 @@
 extern uint8_t _bss_start[];
 extern uint8_t _bss_end[];
 
-void clear_bss(void) {
+void clear_bss(void)
+{
     uint8_t* bss = _bss_start;
     while (bss < _bss_end) {
         *bss++ = 0;
-    }
-}
-
-void timer_tick_handler(registers_t* regs)
-{
-    if (regs->vector == 32) {
-        static uint64_t ticks = 0;
-        ticks++;
-        if (ticks % 100 == 0) {
-            kprintf(".");
-        }
     }
 }
 
@@ -35,8 +25,6 @@ void kernel_main(uint64_t multiboot2_info_addr)
 
     gdt_init();
     idt_init();
-
-    idt_register_interrupt_handler(LAPIC_TIMER_VECTOR, timer_tick_handler);
 
     pic_disable();
 
@@ -62,7 +50,8 @@ void kernel_main(uint64_t multiboot2_info_addr)
 
     kprintf("Kernel Booted.");
 
-    while (1) {
+    while (1)
+    {
         // 'hlt' puts the CPU to sleep until the next hardware interrupt fires,
         // saving power instead of spinning the fan at 100%.
         __asm__ volatile ("hlt");

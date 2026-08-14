@@ -1,7 +1,6 @@
 #ifndef XOS_PANIC_H
 #define XOS_PANIC_H
 
-#include <stdint.h>
 #include <kernel/idt.h>
 
 void kernel_panic(const char* message, registers_t* regs);

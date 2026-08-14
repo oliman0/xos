@@ -1,6 +1,8 @@
+#include <stdint.h>
 #include <kernel/lib/string.h>
 
-void* memcpy(void* restrict dest, const void* restrict src, size_t len) {
+void* memcpy(void* restrict dest, const void* restrict src, size_t len)
+{
     uint8_t* d = (uint8_t*)dest;
     const uint8_t* s = (const uint8_t*)src;
 

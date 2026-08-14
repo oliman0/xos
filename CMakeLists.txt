@@ -57,7 +57,7 @@ configure_file(
 
 # Launch QEMU with the GRUB ISO
 add_custom_target(run
-        COMMAND qemu-system-x86_64 -bios /usr/share/ovmf/OVMF.fd -cdrom kernel.iso -d int -no-reboot -M smm=off -serial stdio
+        COMMAND qemu-system-x86_64 -bios /usr/share/ovmf/OVMF.fd -cdrom kernel.iso -no-reboot -M smm=off -serial stdio
         DEPENDS iso
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "Booting ISO in QEMU..."
