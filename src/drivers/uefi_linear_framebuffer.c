@@ -81,13 +81,36 @@ void fb_clear(uint32_t color)
 {
     bg_color = color;
 
-    for (uint32_t y = 0; y < fb_tag->framebuffer_height; y++)
+    if (fb_tag->framebuffer_bpp == 32)
     {
-        for (uint32_t x = 0; x < fb_tag->framebuffer_width; x++)
+        for (uint32_t y = 0; y < fb_tag->framebuffer_height; y++)
         {
-            fb_put_pixel(x, y, bg_color);
+            uint32_t *fb = (uint32_t *)(fb_virt_addr + y * fb_tag->framebuffer_pitch);
+            for (uint32_t x = 0; x < fb_tag->framebuffer_width; x++)
+            {
+                fb[x] = color;
+            }
+        }
+    } else {
+        // Fallback for 16/24 bpp
+        for (uint32_t y = 0; y < fb_tag->framebuffer_height; y++)
+        {
+            for (uint32_t x = 0; x < fb_tag->framebuffer_width; x++)
+            {
+                fb_put_pixel(x, y, bg_color);
+            }
         }
     }
+}
+
+void fb_set_back_color(uint32_t color)
+{
+    bg_color = color;
+}
+
+void fb_set_front_color(uint32_t color)
+{
+    fg_color = color;
 }
 
 void fb_init(multiboot_tag_framebuffer_t* framebuffer_tag) {

@@ -10,11 +10,30 @@ static inline uint64_t read_cr3(void) {
 
 static uint64_t* get_or_allocate_table(uint64_t* current_table, uint32_t index) {
     if (current_table[index] & PAGE_PRESENT) {
+        if (current_table[index] & PAGE_HUGE) {
+            // Split the 2MB huge page into 512 x 4KB pages
+            uint64_t huge_phys = current_table[index] & PHYS_ADDR_MASK;
+            uint64_t huge_flags = current_table[index] & ~PHYS_ADDR_MASK;
+            huge_flags &= ~PAGE_HUGE;
+
+            uint64_t new_table_phys = (uint64_t)pmm_alloc_frame();
+            if (new_table_phys == 0) return 0;
+
+            uint64_t* new_table_virt = (uint64_t*)PHYS_TO_VIRT(new_table_phys);
+            for (int i = 0; i < 512; i++) {
+                new_table_virt[i] = (huge_phys + (uint64_t)i * PAGE_SIZE) | huge_flags | PAGE_PRESENT;
+            }
+
+            // Replace huge page with pointer to new page table
+            current_table[index] = new_table_phys | PAGE_PRESENT | PAGE_WRITABLE;
+
+            // Flush TLB to ensure the huge page mapping is removed from the TLB
+            uint64_t cr3 = read_cr3();
+            __asm__ volatile("mov %0, %%cr3" :: "r"(cr3) : "memory");
+        }
+
         uint64_t next_table_phys = current_table[index] & PHYS_ADDR_MASK;
-        // Reach page tables through the Direct Map (512GiB window), not the
-        // 2GiB KERNEL_VMA window. The boot direct map covers the low 4GiB,
-        // and every table frame we allocate here is itself low, so this is
-        // always resolvable.
+        // Reach page tables through the Direct Map (512GiB window)
         return (uint64_t*)PHYS_TO_VIRT(next_table_phys);
     }
 
@@ -46,9 +65,35 @@ static void map_page_2mb_in(uint64_t* pml4_virt, uint64_t phys_addr, uint64_t vi
     __asm__ volatile("invlpg (%0)" :: "r"(virt_addr) : "memory");
 }
 
+static void map_page_4k_in(uint64_t* pml4_virt, uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {
+    uint32_t pml4_idx = PML4_GET_INDEX(virt_addr);
+    uint32_t pdpt_idx = PDPT_GET_INDEX(virt_addr);
+    uint32_t pd_idx   = PD_GET_INDEX(virt_addr);
+    uint32_t pt_idx   = PT_GET_INDEX(virt_addr);
+
+    uint64_t* pdpt = get_or_allocate_table(pml4_virt, pml4_idx);
+    uint64_t* pd   = get_or_allocate_table(pdpt, pdpt_idx);
+    uint64_t* pt   = get_or_allocate_table(pd, pd_idx);
+
+    // Map the 4KB physical page with supplied flags
+    pt[pt_idx] = (phys_addr & PHYS_ADDR_MASK) | flags | PAGE_PRESENT;
+
+    // Invalidate single page in TLB
+    __asm__ volatile("invlpg (%0)" :: "r"(virt_addr) : "memory");
+}
+
 static inline uint64_t* current_pml4(void) {
     uint64_t pml4_phys = read_cr3() & PHYS_ADDR_MASK;
     return (uint64_t*)PHYS_TO_VIRT(pml4_phys);
+}
+
+void unmap_identity_map() {
+    pml4[0] = 0;
+
+    // Flush TLB by reloading CR3
+    uint64_t cr3;
+    __asm__ __volatile__ ("mov %%cr3, %0" : "=r"(cr3));
+    __asm__ __volatile__ ("mov %0, %%cr3" : : "r"(cr3) : "memory");
 }
 
 void vmm_init(void) {
@@ -75,11 +120,24 @@ void vmm_map_page_2mb(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {
     map_page_2mb_in(current_pml4(), phys_addr, virt_addr, flags);
 }
 
-void vmm_map_range(uint64_t phys_addr, uint64_t virt_addr, uint64_t size, uint64_t flags) {
-    uint64_t page_offset = 0;
+void vmm_map_page_4kb(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {
+    map_page_4k_in(current_pml4(), phys_addr, virt_addr, flags);
+}
 
-    while (page_offset < size) {
-        vmm_map_page_2mb(phys_addr + page_offset, virt_addr + page_offset, flags);
-        page_offset += HUGE_PAGE_SIZE; // 2MB steps
+void vmm_map_range(uint64_t phys_addr, uint64_t virt_addr, uint64_t size, uint64_t flags) {
+    uint64_t mapped = 0;
+
+    while (mapped < size) {
+        uint64_t remaining = size - mapped;
+        uint64_t curr_phys = phys_addr + mapped;
+        uint64_t curr_virt = virt_addr + mapped;
+
+        if (remaining >= HUGE_PAGE_SIZE && (curr_phys % HUGE_PAGE_SIZE == 0) && (curr_virt % HUGE_PAGE_SIZE == 0)) {
+            vmm_map_page_2mb(curr_phys, curr_virt, flags);
+            mapped += HUGE_PAGE_SIZE;
+        } else {
+            vmm_map_page_4kb(curr_phys, curr_virt, flags);
+            mapped += PAGE_SIZE;
+        }
     }
 }

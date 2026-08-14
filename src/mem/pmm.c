@@ -6,23 +6,6 @@ uint64_t pmm_max_phys_addr = 0;
 static uint8_t *bitmap;
 static uint64_t total_frames;
 
-void clear_bss(void) {
-    uint8_t* bss = _bss_start;
-    while (bss < _bss_end) {
-        *bss++ = 0;
-    }
-}
-
-void unmap_identity_map() {
-    pml4[0] = 0; // Linker handles the virtual address resolution
-
-    // Flush TLB
-    __asm__ __volatile__ (
-        "mov %%cr3, %%rax\n\t"
-        "mov %%rax, %%cr3"
-        : : : "rax", "memory"
-    );
-}
 
 void pmm_init(uint64_t multiboot2_info_addr, multiboot_tag_mmap_t* mmap_tag)
 {

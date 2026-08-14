@@ -17,6 +17,15 @@ add_executable(kernel.bin src/boot/boot.asm src/kernel.c
         src/mem/pmm.c
         src/lib/string.c
         src/mem/vmm.c
+        src/gdt.c
+        src/gdt.asm
+        src/tss.c
+        src/idt.c
+        src/isr.asm
+        src/panic.c
+        src/drivers/pic.c
+        src/drivers/lapic.c
+        src/drivers/acpi.c
 )
 
 # Force CMake to disable position-independent code

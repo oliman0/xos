@@ -2,11 +2,43 @@
 #include <kernel/kernel_io.h>
 #include <kernel/mem/pmm.h>
 #include <kernel/mem/vmm.h>
+#include <kernel/gdt.h>
+#include <kernel/idt.h>
+#include <kernel/drivers/lapic.h>
+#include <kernel/drivers/pic.h>
 #include <kernel/drivers/uefi_linear_framebuffer.h>
+
+extern uint8_t _bss_start[];
+extern uint8_t _bss_end[];
+
+void clear_bss(void) {
+    uint8_t* bss = _bss_start;
+    while (bss < _bss_end) {
+        *bss++ = 0;
+    }
+}
+
+void timer_tick_handler(registers_t* regs)
+{
+    if (regs->vector == 32) {
+        static uint64_t ticks = 0;
+        ticks++;
+        if (ticks % 100 == 0) {
+            kprintf(".");
+        }
+    }
+}
 
 void kernel_main(uint64_t multiboot2_info_addr)
 {
     clear_bss();
+
+    gdt_init();
+    idt_init();
+
+    idt_register_interrupt_handler(LAPIC_TIMER_VECTOR, timer_tick_handler);
+
+    pic_disable();
 
     unmap_identity_map();
 
@@ -16,8 +48,17 @@ void kernel_main(uint64_t multiboot2_info_addr)
     vmm_init();
 
     fb_init(info_table.framebuffer_tag);
-
     fb_clear(0x000d1b2a);
+
+    kprintf("Initializing LAPIC... ");
+    lapic_init(info_table.acpi_tag);
+    kprintf("Done.\n");
+
+    kprintf("Configuring LAPIC timer... ");
+    uint32_t ticks_per_ms = get_lapic_ticks_per_ms();
+    kprintf("Ticks per ms: %d\n", ticks_per_ms);
+    lapic_timer_start_periodic(100, ticks_per_ms, LAPIC_TIMER_VECTOR);
+    kprintf("Timer started.\n");
 
     kprintf("Kernel Booted.");
 

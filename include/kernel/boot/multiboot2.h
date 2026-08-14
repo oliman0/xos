@@ -7,6 +7,7 @@
 #define MULTIBOOT_TAG_TYPE_END 0
 #define MULTIBOOT_TAG_TYPE_MMAP 6
 #define MULTIBOOT_TAG_TYPE_FRAMEBUFFER 8
+#define MULTIBOOT_TAG_TYPE_ACPI 15
 
 #define MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED 0
 #define MULTIBOOT_FRAMEBUFFER_TYPE_RGB     1
@@ -56,8 +57,16 @@ typedef struct
 
 typedef struct
 {
+    uint32_t type;
+    uint32_t size;
+    uint8_t  rsdp[];
+} multiboot_tag_acpi_t;
+
+typedef struct
+{
     multiboot_tag_framebuffer_t *framebuffer_tag;
     multiboot_tag_mmap_t *mmap_tag;
+    multiboot_tag_acpi_t *acpi_tag;
 } multiboot_info_table_t;
 
 multiboot_info_table_t parse_multiboot2_tags(uint64_t multiboot2_info_addr);

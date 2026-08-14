@@ -194,6 +194,7 @@ dbg_play_beep:
 section .setup_stack nobits
 align 16
 stack_bottom: resb 16384
+global stack_top
 stack_top:
 
 section .bss

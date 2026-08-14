@@ -33,6 +33,10 @@ multiboot_info_table_t parse_multiboot2_tags(uint64_t multiboot2_info_addr)
             case MULTIBOOT_TAG_TYPE_MMAP:
                 info_table.mmap_tag = (multiboot_tag_mmap_t *)tag;
                 break;
+
+            case MULTIBOOT_TAG_TYPE_ACPI:
+                info_table.acpi_tag = (multiboot_tag_acpi_t *)tag;
+                break;
         }
 
         // Advance to the next tag (8-byte aligned)

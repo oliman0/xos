@@ -1,15 +1,15 @@
 #include <kernel/kernel_io.h>
 
-static void print_number(uint64_t num, unsigned short int base, bool isSigned)
+static void print_number(uint64_t num, uint8_t base, bool isSigned)
 {
-    if (base > 16) return;
+    if (base < 2 || base > 16) return;
 
     const char* digits = "0123456789ABCDEF";
-    char outBuffer[68];
+    char outBuffer[70];
 
-
-    bool negative = isSigned ? (int)num < 0 : false;
-    if (negative) {
+    bool negative = false;
+    if (isSigned && (int64_t)num < 0) {
+        negative = true;
         num = (uint64_t)(-(int64_t)num);
     }
 
@@ -63,21 +63,21 @@ void kprintf(const char *fmtstr, ...)
 
                 // int (%d)
                 case 'd': {
-                    unsigned int argNum = va_arg(args, unsigned int);
+                    int64_t argNum = va_arg(args, int64_t);
                     print_number(argNum, 10, true);
                 }
                 break;
 
                 // uint (%u)
                 case 'u': {
-                    unsigned int argNum = va_arg(args, unsigned int);
+                    uint64_t argNum = va_arg(args, uint64_t);
                     print_number(argNum, 10, false);
                 }
                 break;
 
                 // uint as hex (%x)
                 case 'x': {
-                    unsigned int argNum = va_arg(args, unsigned int);
+                    uint64_t argNum = va_arg(args, uint64_t);
                     fb_put_str("0x");
                     print_number(argNum, 16, false);
                 }
@@ -85,7 +85,7 @@ void kprintf(const char *fmtstr, ...)
 
                 // uint as octal (%o)
                 case 'o': {
-                    unsigned int argNum = va_arg(args, unsigned int);
+                    uint64_t argNum = va_arg(args, uint64_t);
                     fb_put_str("0o");
                     print_number(argNum, 8, false);
                 }
@@ -93,7 +93,7 @@ void kprintf(const char *fmtstr, ...)
 
                 // uint as binary (%b)
                 case 'b': {
-                    unsigned int argNum = va_arg(args, unsigned int);
+                    uint64_t argNum = va_arg(args, uint64_t);
                     fb_put_str("0b");
                     print_number(argNum, 2, false);
                 }

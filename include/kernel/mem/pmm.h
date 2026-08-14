@@ -7,7 +7,8 @@
 #include <kernel/boot/multiboot2.h>
 #include <kernel/lib/string.h>
 
-#define PAGE_SIZE 4096
+#define PAGE_SIZE 0x1000
+#define HUGE_PAGE_SIZE 0x200000
 
 #define KERNEL_VMA 0xFFFFFFFF80000000ULL
 #define PHYS_ADDR_MASK 0x000FFFFFFFFFF000ULL
@@ -22,13 +23,8 @@ extern uint8_t _bss_start[];
 extern uint8_t _bss_end[];
 
 extern uint8_t _kernel_end;
-extern uint64_t pml4[];
 
 extern uint64_t pmm_max_phys_addr;
-
-void clear_bss();
-
-void unmap_identity_map();
 
 void pmm_init(uint64_t multiboot2_info_addr, multiboot_tag_mmap_t* mmap_tag);
 
