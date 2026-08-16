@@ -12,7 +12,7 @@ include_directories(include)
 add_executable(kernel.bin src/boot/boot.asm src/kernel.c
         src/kernel_io.c
         src/lib/font.c
-        src/drivers/uefi_linear_framebuffer.c
+        src/drivers/linear_framebuffer.c
         src/boot/multiboot2.c
         src/mem/pmm.c
         src/lib/string.c
@@ -28,6 +28,7 @@ add_executable(kernel.bin src/boot/boot.asm src/kernel.c
         src/drivers/acpi.c
         src/drivers/ps2.c
         src/drivers/ioapic.c
+        include/kernel/mem/ptr.h
 )
 
 # Force CMake to disable position-independent code

@@ -17,6 +17,8 @@
 #define IDT_VECTOR_PS2_KEYBOARD 33
 #define IDT_VECTOR_PS2_MOUSE 44
 
+typedef void isr_stub_t;
+
 typedef struct __attribute__((packed))
 {
     uint16_t offset_low;

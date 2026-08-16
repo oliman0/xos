@@ -24,10 +24,10 @@ static uint64_t* get_or_allocate_table(uint64_t* current_table, uint32_t index)
             uint64_t huge_flags = current_table[index] & ~PHYS_ADDR_MASK;
             huge_flags &= ~PAGE_HUGE;
 
-            uint64_t new_table_phys = (uint64_t)pmm_alloc_frame();
+            phys_addr_t new_table_phys = pmm_alloc_frame();
             if (new_table_phys == 0) return 0;
 
-            uint64_t* new_table_virt = (uint64_t*)PHYS_TO_VIRT(new_table_phys);
+            virt_addr_t* new_table_virt = (virt_addr_t*)PHYS_TO_VIRT(new_table_phys);
             for (int i = 0; i < HUGE_PAGE_FRAME_COUNT; i++)
             {
                 new_table_virt[i] = (huge_phys + (uint64_t)i * PAGE_SIZE) | huge_flags | PAGE_PRESENT;
@@ -41,18 +41,18 @@ static uint64_t* get_or_allocate_table(uint64_t* current_table, uint32_t index)
             __asm__ volatile("mov %0, %%cr3" :: "r"(cr3) : "memory");
         }
 
-        uint64_t next_table_phys = current_table[index] & PHYS_ADDR_MASK;
+        phys_addr_t next_table_phys = current_table[index] & PHYS_ADDR_MASK;
         // Reach page tables through the Direct Map (512GiB window)
-        return (uint64_t*)PHYS_TO_VIRT(next_table_phys);
+        return (virt_addr_t*)PHYS_TO_VIRT(next_table_phys);
     }
 
-    uint64_t new_table_phys = (uint64_t)pmm_alloc_frame();
+    phys_addr_t new_table_phys = pmm_alloc_frame();
     if (new_table_phys == 0)
     {
         return 0;
     }
 
-    uint64_t* new_table_virt = (uint64_t*)PHYS_TO_VIRT(new_table_phys);
+    virt_addr_t* new_table_virt = (virt_addr_t*)PHYS_TO_VIRT(new_table_phys);
     memset(new_table_virt, 0, 4096);
 
     current_table[index] = new_table_phys | PAGE_PRESENT | PAGE_WRITABLE;
@@ -60,14 +60,14 @@ static uint64_t* get_or_allocate_table(uint64_t* current_table, uint32_t index)
     return new_table_virt;
 }
 
-static void map_page_2mb_in(uint64_t* pml4_virt, uint64_t phys_addr, uint64_t virt_addr, uint64_t flags)
+static void map_page_2mb_in(virt_addr_t* pml4_virt, phys_addr_t phys_addr, virt_addr_t virt_addr, uint64_t flags)
 {
     uint32_t pml4_idx = PML4_GET_INDEX(virt_addr);
     uint32_t pdpt_idx = PDPT_GET_INDEX(virt_addr);
     uint32_t pd_idx   = PD_GET_INDEX(virt_addr);
 
-    uint64_t* pdpt = get_or_allocate_table(pml4_virt, pml4_idx);
-    uint64_t* pd   = get_or_allocate_table(pdpt, pdpt_idx);
+    virt_addr_t* pdpt = get_or_allocate_table(pml4_virt, pml4_idx);
+    virt_addr_t* pd   = get_or_allocate_table(pdpt, pdpt_idx);
 
     if (pdpt == 0 || pd == 0)
     {
@@ -82,16 +82,16 @@ static void map_page_2mb_in(uint64_t* pml4_virt, uint64_t phys_addr, uint64_t vi
     __asm__ volatile("invlpg (%0)" :: "r"(virt_addr) : "memory");
 }
 
-static void map_page_4k_in(uint64_t* pml4_virt, uint64_t phys_addr, uint64_t virt_addr, uint64_t flags)
+static void map_page_4k_in(virt_addr_t* pml4_virt, phys_addr_t phys_addr, virt_addr_t virt_addr, uint64_t flags)
 {
     uint32_t pml4_idx = PML4_GET_INDEX(virt_addr);
     uint32_t pdpt_idx = PDPT_GET_INDEX(virt_addr);
     uint32_t pd_idx   = PD_GET_INDEX(virt_addr);
     uint32_t pt_idx   = PT_GET_INDEX(virt_addr);
 
-    uint64_t* pdpt = get_or_allocate_table(pml4_virt, pml4_idx);
-    uint64_t* pd   = get_or_allocate_table(pdpt, pdpt_idx);
-    uint64_t* pt   = get_or_allocate_table(pd, pd_idx);
+    virt_addr_t* pdpt = get_or_allocate_table(pml4_virt, pml4_idx);
+    virt_addr_t* pd   = get_or_allocate_table(pdpt, pdpt_idx);
+    virt_addr_t* pt   = get_or_allocate_table(pd, pd_idx);
 
     if (pdpt == 0 || pd == 0 || pt == 0)
     {
@@ -106,10 +106,10 @@ static void map_page_4k_in(uint64_t* pml4_virt, uint64_t phys_addr, uint64_t vir
     __asm__ volatile("invlpg (%0)" :: "r"(virt_addr) : "memory");
 }
 
-static inline uint64_t* current_pml4(void)
+static inline virt_addr_t* current_pml4(void)
 {
-    uint64_t pml4_phys = read_cr3() & PHYS_ADDR_MASK;
-    return (uint64_t*)PHYS_TO_VIRT(pml4_phys);
+    phys_addr_t pml4_phys = read_cr3() & PHYS_ADDR_MASK;
+    return (virt_addr_t*)PHYS_TO_VIRT(pml4_phys);
 }
 
 void unmap_identity_map()
@@ -132,12 +132,12 @@ void vmm_init()
 
     wrmsr(IA32_PAT_MSR, pat);
 
-    uint64_t* pml4_virt = current_pml4();
+    virt_addr_t* pml4_virt = current_pml4();
 
     // The boot direct map already covers the low 4GiB (pd0..pd3), so only map
     // whatever RAM exists above that.
-    uint64_t phys_addr = 0x100000000ULL; // 4GiB
-    uint64_t virt_addr = DIRECT_MAP_BASE + phys_addr;
+    phys_addr_t phys_addr = 0x100000000ULL; // 4GiB
+    virt_addr_t virt_addr = DIRECT_MAP_BASE + phys_addr;
 
     // Loop through all physical RAM detected by PMM and map into DIRECT_MAP_BASE
     while (phys_addr < pmm_max_phys_addr)
@@ -152,25 +152,25 @@ void vmm_init()
     __asm__ volatile("mov %0, %%cr3" :: "r"(cr3) : "memory");
 }
 
-void vmm_map_page_2mb(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags)
+void vmm_map_page_2mb(phys_addr_t phys_addr, virt_addr_t virt_addr, uint64_t flags)
 {
     map_page_2mb_in(current_pml4(), phys_addr, virt_addr, flags);
 }
 
-void vmm_map_page_4kb(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags)
+void vmm_map_page_4kb(phys_addr_t phys_addr, virt_addr_t virt_addr, uint64_t flags)
 {
     map_page_4k_in(current_pml4(), phys_addr, virt_addr, flags);
 }
 
-void vmm_map_range(uint64_t phys_addr, uint64_t virt_addr, uint64_t size, uint64_t flags)
+void vmm_map_range(phys_addr_t phys_addr, virt_addr_t virt_addr, size_t size, uint64_t flags)
 {
     uint64_t mapped = 0;
 
     while (mapped < size)
     {
         uint64_t remaining = size - mapped;
-        uint64_t curr_phys = phys_addr + mapped;
-        uint64_t curr_virt = virt_addr + mapped;
+        phys_addr_t curr_phys = phys_addr + mapped;
+        virt_addr_t curr_virt = virt_addr + mapped;
 
         if (remaining >= HUGE_PAGE_SIZE && IS_ALIGNED(curr_phys, HUGE_PAGE_SIZE))
         {
@@ -184,18 +184,18 @@ void vmm_map_range(uint64_t phys_addr, uint64_t virt_addr, uint64_t size, uint64
     }
 }
 
-void vmm_alloc_map_range(uint64_t virt_addr, uint64_t size, uint64_t flags)
+void vmm_alloc_map_range(virt_addr_t virt_addr, size_t size, uint64_t flags)
 {
     uint64_t mapped = 0;
 
     while (mapped < size)
     {
         uint64_t remaining = size - mapped;
-        uint64_t curr_virt = virt_addr + mapped;
+        virt_addr_t curr_virt = virt_addr + mapped;
 
         if (remaining >= HUGE_PAGE_SIZE && IS_ALIGNED(curr_virt, HUGE_PAGE_SIZE))
         {
-            uint64_t phys = (uint64_t)pmm_alloc_huge_frame();
+            phys_addr_t phys = pmm_alloc_huge_frame();
             if (phys)
             {
                 vmm_map_page_2mb(phys, curr_virt, flags);
@@ -204,7 +204,7 @@ void vmm_alloc_map_range(uint64_t virt_addr, uint64_t size, uint64_t flags)
             }
         }
 
-        uint64_t phys = (uint64_t)pmm_alloc_frame();
+        phys_addr_t phys = pmm_alloc_frame();
         if (phys)
         {
             vmm_map_page_4kb(phys, curr_virt, flags);

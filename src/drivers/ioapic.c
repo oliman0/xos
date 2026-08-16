@@ -3,8 +3,9 @@
 #include <kernel/mem/vmm.h>
 #include <kernel/kernel_io.h>
 #include <stddef.h>
+#include <kernel/mem/ptr.h>
 
-static uintptr_t ioapic_base = 0;
+static virt_addr_t ioapic_base = 0;
 
 static interrupt_override_t overrides[IOAPIC_INTERRUPT_OVERRIDE_LIMIT];
 static int override_count = 0;
@@ -54,7 +55,7 @@ static void ioapic_parse_madt(acpi_madt_t* madt)
 void ioapic_init(multiboot_tag_acpi_t* acpi_tag)
 {
     rsdp_descriptor_20_t* rsdp = (rsdp_descriptor_20_t*)acpi_tag->rsdp;
-    acpi_madt_t* madt = find_acpi_table(rsdp, "APIC");
+    acpi_madt_t* madt = (acpi_madt_t*)find_acpi_table(rsdp, "APIC");
 
     if (madt) ioapic_parse_madt(madt);
 }

@@ -5,7 +5,7 @@
 #include <kernel/kernel_io.h>
 #include <kernel/drivers/lapic.h>
 #include <stdbool.h>
-#include <kernel/drivers/uefi_linear_framebuffer.h>
+#include <kernel/drivers/linear_framebuffer.h>
 
 static bool lshift = false;
 static bool rshift = false;
@@ -135,7 +135,6 @@ static void keyboard_irq_handler(registers_t* regs) {
     if (c)
     {
         kprintf("%c", c);
-        fb_swap_buffers();
     }
 
     lapic_eoi();

@@ -1,6 +1,6 @@
 #include <kernel/panic.h>
 #include <kernel/kernel_io.h>
-#include <kernel/drivers/uefi_linear_framebuffer.h>
+#include <kernel/drivers/linear_framebuffer.h>
 
 static inline uint64_t read_cr0(void)
 {
@@ -60,6 +60,8 @@ void kernel_panic(const char* message, registers_t* regs)
     kprintf("--- Control Registers ---\n");
     kprintf("CR0: %x  CR2: %x  CR3: %x\n", cr0, cr2, cr3);
     kprintf("============================================================\n");
+
+    fb_swap_buffers();
 
     while (1)
     {

@@ -1,6 +1,8 @@
+#include <stddef.h>
 #include <kernel/boot/multiboot2.h>
+#include <kernel/mem/ptr.h>
 
-multiboot_info_table_t parse_multiboot2_tags(uint64_t multiboot2_info_addr)
+multiboot_info_table_t parse_multiboot2_tags(virt_addr_t multiboot2_info_addr)
 {
     multiboot_info_table_t info_table = {0};
 
@@ -10,7 +12,7 @@ multiboot_info_table_t parse_multiboot2_tags(uint64_t multiboot2_info_addr)
     }
 
     // Multiboot2 header: First 4 bytes = total_size, next 4 bytes = reserved
-    uint32_t total_size = *(uint32_t *)multiboot2_info_addr;
+    size_t total_size = *(uint32_t *)multiboot2_info_addr;
     uint8_t *end_addr = (uint8_t *)multiboot2_info_addr + total_size;
 
     // Tags start 8 bytes after the base address

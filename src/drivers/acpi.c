@@ -3,7 +3,7 @@
 #include <kernel/mem/vmm.h>
 #include <stdbool.h>
 
-static bool acpi_checksum(void* table, uint32_t length)
+static bool acpi_checksum(acpi_header_t* table, uint32_t length)
 {
     uint8_t sum = 0;
     uint8_t* ptr = (uint8_t*)table;
@@ -14,7 +14,7 @@ static bool acpi_checksum(void* table, uint32_t length)
     return sum == 0;
 }
 
-void* find_acpi_table(rsdp_descriptor_20_t* rsdp, const char* signature)
+acpi_header_t* find_acpi_table(rsdp_descriptor_20_t* rsdp, const char* signature)
 
 {
     if (rsdp->revision >= 2 && rsdp->xsdt_address)

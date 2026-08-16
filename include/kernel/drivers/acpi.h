@@ -119,6 +119,6 @@ typedef struct __attribute__((packed))
     uint16_t flags;
 } acpi_madt_interrupt_override_t;
 
-void* find_acpi_table(rsdp_descriptor_20_t* rsdp, const char* signature);
+acpi_header_t* find_acpi_table(rsdp_descriptor_20_t* rsdp, const char* signature);
 
 #endif

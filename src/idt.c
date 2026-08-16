@@ -3,12 +3,12 @@
 #include <kernel/kernel_io.h>
 #include <kernel/panic.h>
 #include <kernel/drivers/lapic.h>
-#include <kernel/drivers/uefi_linear_framebuffer.h>
+#include <kernel/drivers/linear_framebuffer.h>
 
 static idt_entry_t idt[IDT_ENTRIES] __attribute__((aligned(16)));
 static idtr_t      idtr;
 
-extern void* isr_stub_table[IDT_ENTRIES];
+extern isr_stub_t* isr_stub_table[IDT_ENTRIES];
 
 static void idt_set_entry(uint8_t num, uint64_t isr_stub, uint16_t selector, uint8_t flags, uint8_t ist)
 {
@@ -91,7 +91,6 @@ void isr_handler(registers_t* regs)
         else
         {
             kprintf("Unhandled interrupt %d\n", regs->vector);
-            fb_swap_buffers();
         }
 
         lapic_eoi();

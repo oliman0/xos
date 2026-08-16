@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <kernel/kernel_io.h>
-#include <kernel/drivers/uefi_linear_framebuffer.h>
+#include <kernel/drivers/linear_framebuffer.h>
 
 static void print_number(uint64_t num, uint8_t base, bool isSigned)
 {
