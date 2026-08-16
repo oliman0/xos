@@ -22,17 +22,18 @@
 // Config Byte Bits
 #define PS2_CONFIG_PORT1_INT (1 << 0)
 #define PS2_CONFIG_PORT2_INT (1 << 1)
+#define PS2_CONFIG_PORT1_CLK (1 << 4)
+#define PS2_CONFIG_PORT2_CLK (1 << 5)
 #define PS2_CONFIG_TRANSLATION (1 << 6)
 
 #define PS2_IRQ_KEYBOARD 1
 #define PS2_IRQ_MOUSE 12
 
-#define PS2_VECTOR_KEYBOARD 33
-#define PS2_VECTOR_MOUSE 44
-
 #define PS2_KBD_LSHIFT 0x2A
 #define PS2_KBD_RSHIFT 0x36
 #define PS2_KBD_RELEASE 0x80
+
+#define PS2_IO_TIMEOUT 10000
 
 bool ps2_init();
 

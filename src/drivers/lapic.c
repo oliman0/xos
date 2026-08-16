@@ -16,19 +16,25 @@ static inline void lapic_write(uint32_t reg, uint32_t val)
     *(volatile uint32_t*)(lapic_base + reg) = val;
 }
 
+static inline void hpet_write(uintptr_t base, uint32_t reg, uint64_t val) {
+    *(volatile uint64_t*)(base + reg) = val;
+}
+static inline uint64_t hpet_read(uintptr_t base, uint32_t reg) {
+    return *(volatile uint64_t*)(base + reg);
+}
+
 static uint32_t get_lapic_ticks_per_ms_cpuid(void)
 {
     uint32_t eax, ebx, ecx, edx;
 
     // Check maximum supported CPUID leaf
     __asm__ __volatile__("cpuid" : "=a"(eax) : "a"(0));
-    if (eax < 0x15) return 0;
+    if (eax < CPUID_LEAF_TSC) return 0;
 
-    // CPUID Leaf 0x15: Time Stamp Counter and Nominal Core Crystal Clock Information
     __asm__ __volatile__(
         "cpuid"
         : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
-        : "a"(0x15)
+        : "a"(CPUID_LEAF_TSC)
     );
 
     if (ecx != 0) {
@@ -43,17 +49,15 @@ static uint32_t get_lapic_ticks_per_ms_hpet()
 {
     if (hpet_base == 0) return 0;
 
-    volatile uint64_t* hpet = (volatile uint64_t*)hpet_base;
-
-    // HPET capabilities register at 0x00
     // Period is in bits 32-63, in femtoseconds (10^-15)
-    uint32_t period = hpet[0] >> 32;
+    uint32_t period = hpet_read(hpet_base, ACPI_HPET_REG_CAPABILITIES) >> 32;
 
     // We want to wait 10ms = 10^13 femtoseconds
     uint64_t ticks_to_wait = 10000000000000ULL / period;
 
-    // Enable HPET counter: Configuration register at 0x10. Bit 0 is 'overall enable'.
-    hpet[2] |= 1;
+    // Enable HPET counter. Bit 0 is 'overall enable'.
+    uint64_t hpet_config = hpet_read(hpet_base, ACPI_HPET_REG_CONFURATION);
+    hpet_write(hpet_base, ACPI_HPET_REG_CONFURATION, hpet_config | 1);
 
     // Set LAPIC divisor to 16
     lapic_write(LAPIC_TDCR_REG, LAPIC_TIMER_DIV_16);
@@ -62,8 +66,8 @@ static uint32_t get_lapic_ticks_per_ms_hpet()
     uint32_t start_lapic = 0xFFFFFFFF;
     lapic_write(LAPIC_TICR_REG, start_lapic);
 
-    uint64_t start_hpet = hpet[30]; // Main counter at 0xF0
-    while (hpet[30] - start_hpet < ticks_to_wait) {
+    uint64_t hpet_start = hpet_read(hpet_base, ACPI_HPET_REG_MAIN_COUNTER);
+    while (hpet_read(hpet_base, ACPI_HPET_REG_MAIN_COUNTER) - hpet_start < ticks_to_wait) {
         __asm__ volatile ("pause");
     }
 
@@ -91,8 +95,7 @@ void lapic_timer_start_periodic(uint32_t frequency_hz, uint32_t ticks_per_ms, ui
 
     lapic_write(LAPIC_LVT_TIMER_REG, LAPIC_TIMER_MODE_PERIODIC | vector);
 
-    uint32_t period_ms = 1000 / frequency_hz;
-    uint32_t init_count = period_ms * ticks_per_ms;
+    uint32_t init_count = (ticks_per_ms * 1000) / frequency_hz;
 
     // start countdown
     lapic_write(LAPIC_TICR_REG, init_count);
@@ -124,7 +127,7 @@ void lapic_init(multiboot_tag_acpi_t* acpi_tag)
     lapic_base = PHYS_TO_VIRT(apic_phys_base);
 
     // Map the LAPIC MMIO as uncacheable. vmm_map_page_4kb now handles huge page splitting.
-    vmm_map_page_4kb(apic_phys_base, lapic_base, PAGE_WRITABLE | PAGE_CACHE_DISABLE);
+    vmm_map_page_4kb(apic_phys_base, lapic_base, PAGE_WRITABLE | PAGE_UC);
 
     if (acpi_tag) {
         rsdp_descriptor_20_t* rsdp = (rsdp_descriptor_20_t*)acpi_tag->rsdp;
@@ -132,7 +135,7 @@ void lapic_init(multiboot_tag_acpi_t* acpi_tag)
         if (hpet_table) {
             uint64_t hpet_phys = hpet_table->address.address;
             hpet_base = PHYS_TO_VIRT(hpet_phys);
-            vmm_map_page_4kb(hpet_phys, hpet_base, PAGE_WRITABLE | PAGE_CACHE_DISABLE);
+            vmm_map_page_4kb(hpet_phys, hpet_base, PAGE_WRITABLE | PAGE_UC);
         }
     }
 

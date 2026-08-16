@@ -1,3 +1,5 @@
+#include <kernel/panic.h>
+#include <kernel/arch/io.h>
 #include <kernel/lib/string.h>
 #include <kernel/mem/pmm.h>
 #include <kernel/mem/vmm.h>
@@ -26,7 +28,7 @@ static uint64_t* get_or_allocate_table(uint64_t* current_table, uint32_t index)
             if (new_table_phys == 0) return 0;
 
             uint64_t* new_table_virt = (uint64_t*)PHYS_TO_VIRT(new_table_phys);
-            for (int i = 0; i < 512; i++)
+            for (int i = 0; i < HUGE_PAGE_FRAME_COUNT; i++)
             {
                 new_table_virt[i] = (huge_phys + (uint64_t)i * PAGE_SIZE) | huge_flags | PAGE_PRESENT;
             }
@@ -67,8 +69,14 @@ static void map_page_2mb_in(uint64_t* pml4_virt, uint64_t phys_addr, uint64_t vi
     uint64_t* pdpt = get_or_allocate_table(pml4_virt, pml4_idx);
     uint64_t* pd   = get_or_allocate_table(pdpt, pdpt_idx);
 
+    if (pdpt == 0 || pd == 0)
+    {
+        kernel_panic("Out of memory", NULL);
+        return;
+    }
+
     // Map the 2MB physical page with supplied flags + HUGE bit
-    pd[pd_idx] = (phys_addr & ~0x1FFFFFULL) | flags | PAGE_PRESENT | PAGE_HUGE;
+    pd[pd_idx] = (phys_addr & ~(HUGE_PAGE_SIZE - 1)) | flags | PAGE_PRESENT | PAGE_HUGE;
 
     // Invalidate single page in TLB instead of reloading entire CR3
     __asm__ volatile("invlpg (%0)" :: "r"(virt_addr) : "memory");
@@ -84,6 +92,12 @@ static void map_page_4k_in(uint64_t* pml4_virt, uint64_t phys_addr, uint64_t vir
     uint64_t* pdpt = get_or_allocate_table(pml4_virt, pml4_idx);
     uint64_t* pd   = get_or_allocate_table(pdpt, pdpt_idx);
     uint64_t* pt   = get_or_allocate_table(pd, pd_idx);
+
+    if (pdpt == 0 || pd == 0 || pt == 0)
+    {
+        kernel_panic("Out of memory", NULL);
+        return;
+    }
 
     // Map the 4KB physical page with supplied flags
     pt[pt_idx] = (phys_addr & PHYS_ADDR_MASK) | flags | PAGE_PRESENT;
@@ -108,8 +122,16 @@ void unmap_identity_map()
     __asm__ __volatile__ ("mov %0, %%cr3" : : "r"(cr3) : "memory");
 }
 
-void vmm_init(void)
+void vmm_init()
 {
+    uint64_t pat = rdmsr(IA32_PAT_MSR);
+
+    // Set PAT slot 2 Write Combining
+    pat &= ~PAT_MASK(PAT_SLOT_WC);
+    pat |= PAT_ENTRY(PAT_SLOT_WC, PAT_TYPE_WC);
+
+    wrmsr(IA32_PAT_MSR, pat);
+
     uint64_t* pml4_virt = current_pml4();
 
     // The boot direct map already covers the low 4GiB (pd0..pd3), so only map
@@ -150,7 +172,7 @@ void vmm_map_range(uint64_t phys_addr, uint64_t virt_addr, uint64_t size, uint64
         uint64_t curr_phys = phys_addr + mapped;
         uint64_t curr_virt = virt_addr + mapped;
 
-        if (remaining >= HUGE_PAGE_SIZE && (curr_phys % HUGE_PAGE_SIZE == 0) && (curr_virt % HUGE_PAGE_SIZE == 0))
+        if (remaining >= HUGE_PAGE_SIZE && IS_ALIGNED(curr_phys, HUGE_PAGE_SIZE))
         {
             vmm_map_page_2mb(curr_phys, curr_virt, flags);
             mapped += HUGE_PAGE_SIZE;
@@ -158,6 +180,40 @@ void vmm_map_range(uint64_t phys_addr, uint64_t virt_addr, uint64_t size, uint64
         {
             vmm_map_page_4kb(curr_phys, curr_virt, flags);
             mapped += PAGE_SIZE;
+        }
+    }
+}
+
+void vmm_alloc_map_range(uint64_t virt_addr, uint64_t size, uint64_t flags)
+{
+    uint64_t mapped = 0;
+
+    while (mapped < size)
+    {
+        uint64_t remaining = size - mapped;
+        uint64_t curr_virt = virt_addr + mapped;
+
+        if (remaining >= HUGE_PAGE_SIZE && IS_ALIGNED(curr_virt, HUGE_PAGE_SIZE))
+        {
+            uint64_t phys = (uint64_t)pmm_alloc_huge_frame();
+            if (phys)
+            {
+                vmm_map_page_2mb(phys, curr_virt, flags);
+                mapped += HUGE_PAGE_SIZE;
+                continue;
+            }
+        }
+
+        uint64_t phys = (uint64_t)pmm_alloc_frame();
+        if (phys)
+        {
+            vmm_map_page_4kb(phys, curr_virt, flags);
+            mapped += PAGE_SIZE;
+        }
+        else
+        {
+            kernel_panic("Out of memory", NULL);
+            return;
         }
     }
 }

@@ -6,19 +6,19 @@
 
 static uintptr_t ioapic_base = 0;
 
-static interrupt_override_t overrides[16];
+static interrupt_override_t overrides[IOAPIC_INTERRUPT_OVERRIDE_LIMIT];
 static int override_count = 0;
 
 static void ioapic_write(uint32_t reg, uint32_t value)
 {
     *(volatile uint32_t*)(ioapic_base) = reg;
-    *(volatile uint32_t*)(ioapic_base + 0x10) = value;
+    *(volatile uint32_t*)(ioapic_base + IOAPIC_REG_WIN) = value;
 }
 
 static uint32_t ioapic_read(uint32_t reg)
 {
     *(volatile uint32_t*)(ioapic_base) = reg;
-    return *(volatile uint32_t*)(ioapic_base + 0x10);
+    return *(volatile uint32_t*)(ioapic_base + IOAPIC_REG_WIN);
 }
 
 static void ioapic_parse_madt(acpi_madt_t* madt)
@@ -34,12 +34,12 @@ static void ioapic_parse_madt(acpi_madt_t* madt)
             acpi_madt_ioapic_t* ioapic = (acpi_madt_ioapic_t*)entry;
 
             ioapic_base = PHYS_TO_VIRT(ioapic->ioapic_address);
-            vmm_map_page_4kb(ioapic->ioapic_address, ioapic_base, PAGE_WRITABLE | PAGE_CACHE_DISABLE);
+            vmm_map_page_4kb(ioapic->ioapic_address, ioapic_base, PAGE_WRITABLE | PAGE_UC);
         }
         else if (entry->type == ACPI_MADT_TYPE_INTERRUPT_OVERRIDE)
         {
             acpi_madt_interrupt_override_t* iso = (acpi_madt_interrupt_override_t*)entry;
-            if (override_count < 16)
+            if (override_count < IOAPIC_INTERRUPT_OVERRIDE_LIMIT)
             {
                 overrides[override_count].irq = iso->irq;
                 overrides[override_count].gsi = iso->global_system_interrupt;
@@ -82,18 +82,18 @@ void ioapic_set_irq(uint8_t irq, uint64_t apic_id, uint8_t vector)
     // Trigger Mode: bit 3 of flags. 0 = same as bus, 1 = edge, 3 = level.
     // For ISA (where PS/2 is), default is Active High, Edge Triggered.
     
-    uint8_t polarity = flags & 0x3;
-    uint8_t trigger = (flags >> 2) & 0x3;
+    uint8_t polarity = flags & ACPI_MADT_ISO_POLARITY_MASK;
+    uint8_t trigger = (flags >> ACPI_MADT_ISO_TRIGGER_SHIFT) & ACPI_MADT_ISO_TRIGGER_MASK;
+
+    if (polarity == ACPI_MADT_ISO_POLARITY_ACTIVE_LOW)
+        low |= IOAPIC_REDTBL_INTPOL;
+
+    if (trigger == ACPI_MADT_ISO_TRIGGER_LEVEL)
+        low |= IOAPIC_REDTBL_TRIGGER;
+    else if (trigger == ACPI_MADT_ISO_TRIGGER_EDGE)
+        low &= ~IOAPIC_REDTBL_TRIGGER;
     
-    // Polarity: 00 = Bus default, 01 = Active High, 11 = Active Low
-    if (polarity == 0x3) low |= (1 << 13); // Active low
-    else if (polarity == 0x1) low &= ~(1 << 13); // Active high
-    
-    // Trigger Mode: 00 = Bus default, 01 = Edge, 11 = Level
-    if (trigger == 0x3) low |= (1 << 15);  // Level triggered
-    else if (trigger == 0x1) low &= ~(1 << 15); // Edge triggered
-    
-    uint32_t high = (uint32_t)(apic_id << 24);
+    uint32_t high = (uint32_t)(apic_id << IOAPIC_REDTBL_DEST_SHIFT);
 
     ioapic_write(IOAPIC_REG_REDTBL + gsi * 2, low);
     ioapic_write(IOAPIC_REG_REDTBL + gsi * 2 + 1, high);

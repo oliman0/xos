@@ -21,6 +21,11 @@ void clear_bss(void)
     }
 }
 
+void timer_irq_handler(registers_t* regs)
+{
+    (void)regs;
+}
+
 void kernel_main(uint64_t multiboot2_info_addr)
 {
     clear_bss();
@@ -38,23 +43,42 @@ void kernel_main(uint64_t multiboot2_info_addr)
     vmm_init();
 
     fb_init(info_table.framebuffer_tag);
+
     fb_clear(0x000d1b2a);
+    fb_swap_buffers();
 
     kprintf("Initializing LAPIC... ");
+    fb_swap_buffers();
+
     lapic_init(info_table.acpi_tag);
+
     kprintf("Done.\n");
+    fb_swap_buffers();
 
     kprintf("Initializing IOAPIC... ");
+    fb_swap_buffers();
+
     ioapic_init(info_table.acpi_tag);
+
     kprintf("Done.\n");
+    fb_swap_buffers();
 
     kprintf("Configuring LAPIC timer... ");
+    fb_swap_buffers();
+
     uint32_t ticks_per_ms = get_lapic_ticks_per_ms();
+
     kprintf("Ticks per ms: %d\n", ticks_per_ms);
-    lapic_timer_start_periodic(100, ticks_per_ms, LAPIC_TIMER_VECTOR);
+    fb_swap_buffers();
+
+    lapic_timer_start_periodic(100, ticks_per_ms, IDT_VECTOR_TIMER);
+    idt_register_interrupt_handler(IDT_VECTOR_TIMER, timer_irq_handler);
+
     kprintf("Timer started.\n");
+    fb_swap_buffers();
 
     kprintf("Initializing PS/2 Driver... ");
+    fb_swap_buffers();
     if (ps2_init())
     {
         kprintf("Done.\n");
@@ -63,8 +87,10 @@ void kernel_main(uint64_t multiboot2_info_addr)
     {
         kprintf("Failed.\n");
     }
+    fb_swap_buffers();
 
     kprintf("Kernel Booted.\n");
+    fb_swap_buffers();
 
     while (1)
     {

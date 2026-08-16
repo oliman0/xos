@@ -5,6 +5,7 @@
 #include <kernel/kernel_io.h>
 #include <kernel/drivers/lapic.h>
 #include <stdbool.h>
+#include <kernel/drivers/uefi_linear_framebuffer.h>
 
 static bool lshift = false;
 static bool rshift = false;
@@ -90,13 +91,13 @@ static unsigned char kbd_us_shift[128] =
 };
 
 static bool ps2_wait_read() {
-    int timeout = 100000;
+    int timeout = PS2_IO_TIMEOUT;
     while (!(inb(PS2_STATUS_PORT) & PS2_STATUS_OUTPUT_FULL) && timeout-- > 0);
     return timeout > 0;
 }
 
 static bool ps2_wait_write() {
-    int timeout = 100000;
+    int timeout = PS2_IO_TIMEOUT;
     while ((inb(PS2_STATUS_PORT) & PS2_STATUS_INPUT_FULL) && timeout-- > 0);
     return timeout > 0;
 }
@@ -127,16 +128,20 @@ static char handle_keyboard_scancode(uint8_t scancode) {
     return 0;
 }
 
-static void keyboard_iqr_handler(registers_t* regs) {
+static void keyboard_irq_handler(registers_t* regs) {
     uint8_t scancode = inb(PS2_DATA_PORT);
 
     char c = handle_keyboard_scancode(scancode);
-    if (c) kprintf("%c", c);
+    if (c)
+    {
+        kprintf("%c", c);
+        fb_swap_buffers();
+    }
 
     lapic_eoi();
 }
 
-static void mouse_iqr_handler(registers_t* regs) {
+static void mouse_irq_handler(registers_t* regs) {
     uint8_t data = inb(PS2_DATA_PORT);
 
     lapic_eoi();
@@ -158,7 +163,7 @@ bool ps2_init() {
     io_wait();
 
     // Flush output buffer
-    int flush_timeout = 1000;
+    int flush_timeout = PS2_IO_TIMEOUT;
     while ((inb(PS2_STATUS_PORT) & PS2_STATUS_OUTPUT_FULL) && flush_timeout-- > 0) {
         inb(PS2_DATA_PORT);
         io_wait();
@@ -168,20 +173,17 @@ bool ps2_init() {
     outb(PS2_COMMAND_PORT, PS2_CMD_READ_CONFIG);
     if (!ps2_wait_read()) return false;
     uint8_t config = inb(PS2_DATA_PORT);
-    
-    // Check if it's a dual-channel controller
-    // According to some sources, a dual channel controller has bit 5 (Port 2 Clock Disabled) 
-    // set or clearable in the configuration byte.
-    // A better way is to disable the second port and see if the bit 5 is set.
-    // But since we just disabled it, let's see.
-    bool dual_channel = (config & (1 << 5)) != 0;
+
+    // Check for dual channel
+    // Is Port 2 Clock Disable bit set while Port 2 disabled
+    bool dual_channel = (config & PS2_CONFIG_PORT2_CLK) != 0;
     
     // Enable interrupts for both ports (if supported) and translation
     config |= PS2_CONFIG_PORT1_INT | PS2_CONFIG_TRANSLATION;
-    config &= ~(1 << 4); // Enable port 1 clock
+    config &= ~PS2_CONFIG_PORT1_CLK;
     if (dual_channel) {
         config |= PS2_CONFIG_PORT2_INT;
-        config &= ~(1 << 5); // Enable port 2 clock
+        config &= ~PS2_CONFIG_PORT2_CLK;
     }
     
     // Set controller configuration byte
@@ -199,13 +201,13 @@ bool ps2_init() {
     }
 
     // Register handlers
-    idt_register_interrupt_handler(PS2_VECTOR_KEYBOARD, keyboard_iqr_handler);
-    if (dual_channel) idt_register_interrupt_handler(PS2_VECTOR_MOUSE, mouse_iqr_handler);
+    idt_register_interrupt_handler(IDT_VECTOR_PS2_KEYBOARD, keyboard_irq_handler);
+    if (dual_channel) idt_register_interrupt_handler(IDT_VECTOR_PS2_MOUSE, mouse_irq_handler);
 
     // Configure IOAPIC
     // We assume the BSP has LAPIC ID 0
-    ioapic_set_irq(PS2_IRQ_KEYBOARD, 0, PS2_VECTOR_KEYBOARD);
-    if (dual_channel) ioapic_set_irq(PS2_IRQ_MOUSE, 0, PS2_VECTOR_MOUSE);
+    ioapic_set_irq(PS2_IRQ_KEYBOARD, 0, IDT_VECTOR_PS2_KEYBOARD);
+    if (dual_channel) ioapic_set_irq(PS2_IRQ_MOUSE, 0, IDT_VECTOR_PS2_MOUSE);
 
     return true;
 }

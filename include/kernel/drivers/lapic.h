@@ -31,9 +31,7 @@
 #define LAPIC_TIMER_DIV_16  0x03
 #define LAPIC_TIMER_DIV_128 0x0A
 
-#define LAPIC_TIMER_VECTOR 32
-
-#define PIT_BASE_FREQUENCY   1193182
+#define CPUID_LEAF_TSC 0x15
 
 void lapic_init(multiboot_tag_acpi_t* acpi_tag);
 void lapic_eoi();

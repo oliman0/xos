@@ -18,6 +18,23 @@
 #define PAGE_GLOBAL        (1ull << 8)
 #define PAGE_NX            (1ull << 63)
 
+#define PAGE_WC            (PAGE_CACHE_DISABLE)
+#define PAGE_UC            (PAGE_CACHE_DISABLE | PAGE_WRITE_THROUGH)
+
+#define IA32_PAT_MSR       0x277
+
+#define PAT_TYPE_UC        0x00ULL
+#define PAT_TYPE_WC        0x01ULL
+#define PAT_TYPE_WT        0x04ULL
+#define PAT_TYPE_WP        0x05ULL
+#define PAT_TYPE_WB        0x06ULL
+#define PAT_TYPE_UC_MINUS  0x07ULL
+
+#define PAT_MASK(slot)           (0xFFULL << ((slot) * 8))
+#define PAT_ENTRY(slot, type)    ((uint64_t)(type) << ((slot) * 8))
+
+#define PAT_SLOT_WC 2
+
 #define PML4_GET_INDEX(addr) (((addr) >> 39) & 0x1FF)
 #define PDPT_GET_INDEX(addr) (((addr) >> 30) & 0x1FF)
 #define PD_GET_INDEX(addr)   (((addr) >> 21) & 0x1FF)
@@ -34,5 +51,6 @@ void vmm_map_page_2mb(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags);
 void vmm_map_page_4kb(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags);
 
 void vmm_map_range(uint64_t phys_addr, uint64_t virt_addr, uint64_t size, uint64_t flags);
+void vmm_alloc_map_range(uint64_t virt_addr, uint64_t size, uint64_t flags);
 
 #endif

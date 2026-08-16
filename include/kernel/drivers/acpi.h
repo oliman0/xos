@@ -3,6 +3,29 @@
 
 #include <stdint.h>
 
+#define ACPI_MADT_ISO_POLARITY_MASK         0x3
+#define ACPI_MADT_ISO_POLARITY_BUS_DEFAULT  0x0
+#define ACPI_MADT_ISO_POLARITY_ACTIVE_HIGH  0x1
+#define ACPI_MADT_ISO_POLARITY_ACTIVE_LOW   0x3
+
+#define ACPI_MADT_ISO_TRIGGER_MASK          0x3
+#define ACPI_MADT_ISO_TRIGGER_SHIFT         2
+#define ACPI_MADT_ISO_TRIGGER_BUS_DEFAULT   0x0
+#define ACPI_MADT_ISO_TRIGGER_EDGE          0x1
+#define ACPI_MADT_ISO_TRIGGER_LEVEL         0x3
+
+#define ACPI_HPET_REG_CAPABILITIES 0x00
+#define ACPI_HPET_REG_CONFURATION 0x10
+#define ACPI_HPET_REG_MAIN_COUNTER 0xF0
+
+#define ACPI_MADT_TYPE_LOCAL_APIC 0
+#define ACPI_MADT_TYPE_IOAPIC 1
+#define ACPI_MADT_TYPE_INTERRUPT_OVERRIDE 2
+#define ACPI_MADT_TYPE_NMI_SOURCE 3
+#define ACPI_MADT_TYPE_LOCAL_APIC_NMI 4
+#define ACPI_MADT_TYPE_LOCAL_APIC_ADDRESS_OVERRIDE 5
+#define ACPI_MADT_TYPE_LOCAL_X2APIC 9
+
 typedef struct __attribute__((packed))
 {
     char signature[4];
@@ -69,14 +92,6 @@ typedef struct __attribute__((packed))
     uint8_t type;
     uint8_t length;
 } acpi_madt_entry_t;
-
-#define ACPI_MADT_TYPE_LOCAL_APIC 0
-#define ACPI_MADT_TYPE_IOAPIC 1
-#define ACPI_MADT_TYPE_INTERRUPT_OVERRIDE 2
-#define ACPI_MADT_TYPE_NMI_SOURCE 3
-#define ACPI_MADT_TYPE_LOCAL_APIC_NMI 4
-#define ACPI_MADT_TYPE_LOCAL_APIC_ADDRESS_OVERRIDE 5
-#define ACPI_MADT_TYPE_LOCAL_X2APIC 9
 
 typedef struct __attribute__((packed))
 {

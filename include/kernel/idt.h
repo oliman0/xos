@@ -3,6 +3,20 @@
 
 #include <stdint.h>
 
+#define IDT_ENTRIES 256
+#define IDT_CPU_EXCEPTION_COUNT 32
+
+#define IDT_ENTRY_PRESENT 0x80
+#define IDT_ENTRY_RING_0  0x00
+#define IDT_ENTRY_INTERRUPT_64GATE 0x0E
+
+#define IDT_KERNEL_CS 0x08
+
+#define IDT_VECTOR_DF 8
+#define IDT_VECTOR_TIMER 32
+#define IDT_VECTOR_PS2_KEYBOARD 33
+#define IDT_VECTOR_PS2_MOUSE 44
+
 typedef struct __attribute__((packed))
 {
     uint16_t offset_low;

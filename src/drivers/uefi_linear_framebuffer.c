@@ -1,10 +1,14 @@
 #include <stddef.h>
 #include <kernel/drivers/uefi_linear_framebuffer.h>
 #include <kernel/lib/font.h>
+#include <kernel/lib/string.h>
 #include <kernel/mem/pmm.h>
 #include <kernel/mem/vmm.h>
 
 static multiboot_tag_framebuffer_t* fb_tag;
+
+static uint64_t vram_virt_addr;
+static uint64_t backbuffer_virt_addr;
 
 static uint64_t fb_virt_addr;
 
@@ -117,16 +121,28 @@ void fb_set_front_color(uint32_t color)
     fg_color = color;
 }
 
+void fb_swap_buffers() {
+    uint64_t fb_size = (uint64_t)fb_tag->framebuffer_height * fb_tag->framebuffer_pitch;
+    memcpy((void*)vram_virt_addr, (void*)backbuffer_virt_addr, fb_size);
+}
+
 void fb_init(multiboot_tag_framebuffer_t* framebuffer_tag) {
     fb_tag = framebuffer_tag;
-
-    fb_virt_addr = PHYS_TO_VIRT(fb_tag->framebuffer_addr);
 
     uint64_t fb_size = (uint64_t)fb_tag->framebuffer_height * fb_tag->framebuffer_pitch;
     // Round up to a full 2MiB page so the last scanlines are always mapped
     fb_size = (fb_size + HUGE_PAGE_SIZE - 1) & ~((uint64_t)HUGE_PAGE_SIZE - 1);
 
-    vmm_map_range(fb_tag->framebuffer_addr, fb_virt_addr, fb_size, PAGE_WRITABLE | PAGE_CACHE_DISABLE);
+    // Map VRAM
+    vram_virt_addr = PHYS_TO_VIRT(fb_tag->framebuffer_addr);
+    vmm_map_range(fb_tag->framebuffer_addr, vram_virt_addr, fb_size, PAGE_WRITABLE | PAGE_WC);
+
+    // Allocate and map backbuffer
+    backbuffer_virt_addr = FB_BACKBUFFER_BASE;
+    vmm_alloc_map_range(backbuffer_virt_addr, fb_size, PAGE_WRITABLE);
+
+    // Set active buffer to backbuffer
+    fb_virt_addr = backbuffer_virt_addr;
 
     bg_color = 0x00000000;
     fg_color = 0xffffffff;
