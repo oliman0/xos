@@ -4,8 +4,9 @@ section .text
 global load_gdt
 global load_tss
 
+; load_gdt(uint64_t gdt_ptr_addr)
+; rdi = gdt_ptr_addr
 load_gdt:
-    ; rdi contains address of gdt_pointer_t
     lgdt [rdi]
 
     ; Reload data segment registers with Kernel Data Selector (0x10)
@@ -27,6 +28,7 @@ load_gdt:
 .flush:
     ret
 
+; load_tss()
 load_tss:
     mov ax, 0x28 ; Tss selector
     ltr ax

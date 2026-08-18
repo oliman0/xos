@@ -3,9 +3,9 @@
 #include <kernel/mem/vmm.h>
 #include <kernel/kernel_io.h>
 #include <stddef.h>
-#include <kernel/mem/ptr.h>
 
-static virt_addr_t ioapic_base = 0;
+
+static uint64_t ioapic_base = 0;
 
 static interrupt_override_t overrides[IOAPIC_INTERRUPT_OVERRIDE_LIMIT];
 static int override_count = 0;

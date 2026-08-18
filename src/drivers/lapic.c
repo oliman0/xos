@@ -2,10 +2,10 @@
 #include <kernel/arch/io.h>
 #include <kernel/mem/vmm.h>
 #include <kernel/drivers/acpi.h>
-#include <kernel/mem/ptr.h>
 
-static virt_addr_t lapic_base = 0;
-static virt_addr_t hpet_base = 0;
+
+static uint64_t lapic_base = 0;
+static uint64_t hpet_base = 0;
 
 static inline uint32_t lapic_read(uint32_t reg)
 {
@@ -17,10 +17,10 @@ static inline void lapic_write(uint32_t reg, uint32_t val)
     *(volatile uint32_t*)(lapic_base + reg) = val;
 }
 
-static inline void hpet_write(virt_addr_t base, uint32_t reg, uint64_t val) {
+static inline void hpet_write(uint64_t base, uint32_t reg, uint64_t val) {
     *(volatile uint64_t*)(base + reg) = val;
 }
-static inline uint64_t hpet_read(virt_addr_t base, uint32_t reg) {
+static inline uint64_t hpet_read(uint64_t base, uint32_t reg) {
     return *(volatile uint64_t*)(base + reg);
 }
 
@@ -123,7 +123,7 @@ void lapic_init(multiboot_tag_acpi_t* acpi_tag)
     }
 
     // Read the physical base of the Local APIC MMIO
-    phys_addr_t apic_phys_base = apic_msr & IA32_APIC_BASE_MSR_MASK;
+    uint64_t apic_phys_base = apic_msr & IA32_APIC_BASE_MSR_MASK;
 
     lapic_base = PHYS_TO_VIRT(apic_phys_base);
 

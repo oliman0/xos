@@ -4,11 +4,13 @@
 #include <kernel/mem/vmm.h>
 #include <kernel/gdt.h>
 #include <kernel/idt.h>
+#include <kernel/scheduler.h>
 #include <kernel/drivers/lapic.h>
 #include <kernel/drivers/ioapic.h>
 #include <kernel/drivers/pic.h>
 #include <kernel/drivers/ps2.h>
 #include <kernel/drivers/linear_framebuffer.h>
+#include <kernel/mem/heap.h>
 
 extern uint8_t _bss_start[];
 extern uint8_t _bss_end[];
@@ -23,8 +25,14 @@ void clear_bss(void)
 
 void timer_irq_handler(registers_t* regs)
 {
-    (void)regs;
-    fb_swap_buffers();
+    lapic_eoi();
+
+    scheduler_preempt(regs);
+}
+
+void worker_thread_test()
+{
+    kprintf("Worker thread test!\n");
 }
 
 void kernel_main(uint64_t multiboot2_info_addr)
@@ -42,6 +50,9 @@ void kernel_main(uint64_t multiboot2_info_addr)
 
     pmm_init(multiboot2_info_addr, info_table.mmap_tag);
     vmm_init();
+    heap_init();
+
+    scheduler_init();
 
     fb_init(info_table.framebuffer_tag);
 
@@ -66,8 +77,8 @@ void kernel_main(uint64_t multiboot2_info_addr)
 
     kprintf("Ticks per ms: %d\n", ticks_per_ms);
 
-    lapic_timer_start_periodic(100, ticks_per_ms, IDT_VECTOR_TIMER);
     idt_register_interrupt_handler(IDT_VECTOR_TIMER, timer_irq_handler);
+    lapic_timer_start_periodic(100, ticks_per_ms, IDT_VECTOR_TIMER);
 
     kprintf("Timer started.\n");
 
@@ -83,10 +94,12 @@ void kernel_main(uint64_t multiboot2_info_addr)
 
     kprintf("Kernel Booted.\n");
 
+    thread_t* t1 = create_kernel_thread(worker_thread_test);
+    scheduler_ready(t1);
+
     while (1)
     {
-        // 'hlt' puts the CPU to sleep until the next hardware interrupt fires,
-        // saving power instead of spinning the fan at 100%.
+        fb_swap_buffers();
         __asm__ volatile ("hlt");
     }
 }

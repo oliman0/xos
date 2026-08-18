@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 #include <kernel/boot/multiboot2.h>
-#include <kernel/mem/ptr.h>
+
 
 #define PAGE_SIZE 0x1000
 #define HUGE_PAGE_SIZE 0x200000
@@ -23,23 +23,24 @@
 
 #define IS_ALIGNED(x, a) (((x) & ((a) - 1)) == 0)
 #define ALIGN_UP(x, a) (((x) + ((a) - 1)) & ~((a) - 1))
+#define ALIGN_DOWN(x, a) ((x) & ~((a) - 1))
 
 extern uint8_t _bss_start[];
 extern uint8_t _bss_end[];
 
 extern uint8_t _kernel_end;
 
-extern phys_addr_t pmm_max_phys_addr;
+extern uint64_t pmm_max_phys_addr;
 
-void pmm_init(virt_addr_t multiboot2_info_addr, multiboot_tag_mmap_t* mmap_tag);
+void pmm_init(uint64_t multiboot2_info_addr, multiboot_tag_mmap_t* mmap_tag);
 
-phys_addr_t pmm_alloc_frame();
-phys_addr_t pmm_alloc_huge_frame();
+uint64_t pmm_alloc_frame();
+uint64_t pmm_alloc_huge_frame();
 
-void pmm_reserve_frame(phys_addr_t physical_addr);
-void pmm_reserve_region(phys_addr_t start_addr, size_t size);
+void pmm_free_frame(uint64_t physical_addr);
+void pmm_free_range(uint64_t base_addr, size_t size);
 
-void pmm_free_frame(phys_addr_t physical_addr);
-void pmm_free_region(phys_addr_t base_addr, size_t size);
+void pmm_reserve_frame(uint64_t physical_addr);
+void pmm_reserve_range(uint64_t start_addr, size_t size);
 
 #endif

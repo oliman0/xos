@@ -7,9 +7,9 @@
 
 typedef struct
 {
-    virt_addr_t vram_base;
-    virt_addr_t backbuffer_base;
-    virt_addr_t active_fb_base;
+    uint64_t vram_base;
+    uint64_t backbuffer_base;
+    uint64_t active_fb_base;
 
     uint32_t width;
     uint32_t height;
@@ -201,6 +201,9 @@ void fb_put_str(const char* str)
 void fb_clear(uint32_t color) {
     fb_state.bg_color = color;
     fb_state.clear_raw(color);
+
+    fb_state.cursor_x = 0;
+    fb_state.cursor_y = 0;
 }
 
 

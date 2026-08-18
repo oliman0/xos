@@ -27,6 +27,7 @@ void kernel_panic(const char* message, registers_t* regs)
 {
     fb_clear(0);
     fb_set_front_color(0xFF6B6B);
+    fb_set_font_scale(1);
 
     // Immediately disable interrupts to prevent secondary faults from interrupting the dump
     __asm__ volatile ("cli");

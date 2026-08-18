@@ -3,19 +3,19 @@
 #include <kernel/mem/pmm.h>
 #include <kernel/mem/vmm.h>
 
-phys_addr_t pmm_max_phys_addr = 0;
+uint64_t pmm_max_phys_addr = 0;
 
 static uint8_t *bitmap;
 static uint64_t total_frames;
 
-void pmm_init(virt_addr_t multiboot2_info_addr, multiboot_tag_mmap_t* mmap_tag)
+void pmm_init(uint64_t multiboot2_info_addr, multiboot_tag_mmap_t* mmap_tag)
 {
-    phys_addr_t max_addr = 0;
+    uint64_t max_addr = 0;
     uint32_t num_entries = (mmap_tag->size - sizeof(multiboot_tag_mmap_t)) / mmap_tag->entry_size;
 
     for (uint32_t i = 0; i < num_entries; i++)
     {
-        phys_addr_t entry_addr = (phys_addr_t)mmap_tag->entries + (i * mmap_tag->entry_size);
+        uint64_t entry_addr = (uint64_t)mmap_tag->entries + (i * mmap_tag->entry_size);
         multiboot_mmap_entry_t *entry = (multiboot_mmap_entry_t *)entry_addr;
 
         if (entry->addr + entry->len > max_addr)
@@ -29,15 +29,15 @@ void pmm_init(virt_addr_t multiboot2_info_addr, multiboot_tag_mmap_t* mmap_tag)
     size_t bitmap_size_bytes = (total_frames + 7) / 8;
 
     // Convert kernel_end to PHYSICAL address for calculations
-    phys_addr_t kernel_end_phys = (phys_addr_t)&_kernel_end - KERNEL_VMA;
+    uint64_t kernel_end_phys = (uint64_t)&_kernel_end - KERNEL_VMA;
 
     // Multiboot info address is VIRTUAL
-    phys_addr_t mb2_start_phys = multiboot2_info_addr - KERNEL_VMA;
-    phys_addr_t mb2_total_size = *(uint32_t*)multiboot2_info_addr;
-    phys_addr_t mb2_end_phys = mb2_start_phys + mb2_total_size;
+    uint64_t mb2_start_phys = multiboot2_info_addr - KERNEL_VMA;
+    uint64_t mb2_total_size = *(uint32_t*)multiboot2_info_addr;
+    uint64_t mb2_end_phys = mb2_start_phys + mb2_total_size;
 
     // Work strictly in physical addresses
-    phys_addr_t bitmap_start_phys = kernel_end_phys;
+    uint64_t bitmap_start_phys = kernel_end_phys;
 
     if (bitmap_start_phys < mb2_end_phys)
     {
@@ -57,25 +57,25 @@ void pmm_init(virt_addr_t multiboot2_info_addr, multiboot_tag_mmap_t* mmap_tag)
     // Free available memory regions (using physical addresses)
     for (uint32_t i = 0; i < num_entries; i++)
     {
-        phys_addr_t entry_addr = (phys_addr_t)mmap_tag->entries + (i * mmap_tag->entry_size);
+        uint64_t entry_addr = (uint64_t)mmap_tag->entries + (i * mmap_tag->entry_size);
         multiboot_mmap_entry_t *entry = (multiboot_mmap_entry_t *)entry_addr;
 
         if (entry->type == MULTIBOOT_MEMORY_AVAILABLE)
         {
-            pmm_free_region(entry->addr, entry->len);
+            pmm_free_range(entry->addr, entry->len);
         }
     }
 
     // Reserve lower memory up through the bitmap (using physical addresses)
-    phys_addr_t reserved_end_phys = bitmap_start_phys + bitmap_size_bytes;
-    pmm_reserve_region(0, reserved_end_phys);
+    uint64_t reserved_end_phys = bitmap_start_phys + bitmap_size_bytes;
+    pmm_reserve_range(0, reserved_end_phys);
 
     pmm_max_phys_addr = max_addr;
 }
 
 static uint64_t last_alloc_index = 0;
 
-phys_addr_t pmm_alloc_frame()
+uint64_t pmm_alloc_frame()
 {
     for (uint64_t i = last_alloc_index; i < total_frames; i++)
     {
@@ -97,10 +97,10 @@ phys_addr_t pmm_alloc_frame()
         }
     }
 
-    return (phys_addr_t)NULL;
+    return (uint64_t)NULL;
 }
 
-phys_addr_t pmm_alloc_huge_frame()
+uint64_t pmm_alloc_huge_frame()
 {
     uint64_t start_index = ALIGN_UP(last_alloc_index, HUGE_PAGE_FRAME_COUNT);
 
@@ -153,10 +153,10 @@ phys_addr_t pmm_alloc_huge_frame()
         }
     }
 
-    return (phys_addr_t)NULL;
+    return (uint64_t)NULL;
 }
 
-void pmm_free_frame(phys_addr_t physical_addr)
+void pmm_free_frame(uint64_t physical_addr)
 {
     uint64_t frame_index = physical_addr / PAGE_SIZE;
 
@@ -171,7 +171,7 @@ void pmm_free_frame(phys_addr_t physical_addr)
     }
 }
 
-void pmm_reserve_frame(phys_addr_t physical_addr)
+void pmm_reserve_frame(uint64_t physical_addr)
 {
     uint64_t frame_index = physical_addr / PAGE_SIZE;
 
@@ -186,7 +186,7 @@ void pmm_reserve_frame(phys_addr_t physical_addr)
     }
 }
 
-void pmm_free_region(phys_addr_t physical_addr, size_t size)
+void pmm_free_range(uint64_t physical_addr, size_t size)
 {
     uint64_t start_frame = ALIGN_UP(physical_addr, PAGE_SIZE) / PAGE_SIZE;
     uint64_t end_frame = (physical_addr + size) / PAGE_SIZE;
@@ -206,7 +206,7 @@ void pmm_free_region(phys_addr_t physical_addr, size_t size)
     }
 }
 
-void pmm_reserve_region(phys_addr_t physical_addr, size_t size)
+void pmm_reserve_range(uint64_t physical_addr, size_t size)
 {
     // Round down to the nearest frame boundary
     uint64_t start_frame = physical_addr / PAGE_SIZE;

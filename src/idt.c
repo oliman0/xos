@@ -4,6 +4,7 @@
 #include <kernel/panic.h>
 #include <kernel/drivers/lapic.h>
 #include <kernel/drivers/linear_framebuffer.h>
+#include <kernel/lib/string.h>
 
 static idt_entry_t idt[IDT_ENTRIES] __attribute__((aligned(16)));
 static idtr_t      idtr;
@@ -45,6 +46,8 @@ void idt_init()
 
         idt_set_entry(i, (uint64_t)isr_stub_table[i], IDT_KERNEL_CS, flags, ist);
     }
+
+    memset(irq_handlers, 0, sizeof(irq_handlers));
 
     // Load IDTR via inline assembly
     __asm__ volatile ("lidt %0" : : "m"(idtr));

@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include <kernel/mem/ptr.h>
+
 
 // The virtual base for the Direct Physical Map (PML4 Entry 256)
 #define DIRECT_MAP_BASE 0xFFFF800000000000ULL
@@ -45,15 +45,20 @@
 
 #define PHYS_TO_VIRT(phys_addr) ((phys_addr) + DIRECT_MAP_BASE)
 
-extern phys_addr_t pml4[];
+extern uint64_t pml4[];
 
 void vmm_init();
 void unmap_identity_map();
 
-void vmm_map_page_2mb(phys_addr_t phys_addr, virt_addr_t virt_addr, uint64_t flags);
-void vmm_map_page_4kb(phys_addr_t phys_addr, virt_addr_t virt_addr, uint64_t flags);
+void vmm_map_page_2mb(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags);
+void vmm_map_page_4kb(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags);
 
-void vmm_map_range(phys_addr_t phys_addr, virt_addr_t virt_addr, size_t size, uint64_t flags);
-void vmm_alloc_map_range(virt_addr_t virt_addr, size_t size, uint64_t flags);
+void vmm_map_range(uint64_t phys_addr, uint64_t virt_addr, size_t size, uint64_t flags);
+void vmm_alloc_map_range(uint64_t virt_addr, size_t size, uint64_t flags);
+
+uint64_t vmm_unmap_page_2mb(uint64_t virt_addr);
+uint64_t vmm_unmap_page_4kb(uint64_t virt_addr);
+
+void vmm_free_unmap_range(uint64_t virt_addr, size_t size);
 
 #endif

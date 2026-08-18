@@ -1,8 +1,9 @@
 #include <kernel/gdt.h>
 #include <kernel/tss.h>
 
+
 extern void load_gdt(uint64_t gdt_ptr);
-extern void load_tss(void);
+extern void load_tss();
 
 // Define entries: Null, Kernel Code, Kernel Data, User Code, User Data, TSS (2 slots)
 static gdt_entry_t gdt[7] __attribute__((aligned(16)));

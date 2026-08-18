@@ -16,7 +16,7 @@ isr_stub_%1:
 %macro ISR_ERRCODE 1
 global isr_stub_%1
 isr_stub_%1:
-    ; CPU already pushed error code!
+    ; CPU already pushed error code
     push qword %1         ; Push interrupt vector number
     jmp isr_common_stub
 %endmacro
