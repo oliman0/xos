@@ -30,11 +30,6 @@ void timer_irq_handler(registers_t* regs)
     scheduler_preempt(regs);
 }
 
-void worker_thread_test()
-{
-    kprintf("Worker thread test!\n");
-}
-
 void kernel_main(uint64_t multiboot2_info_addr)
 {
     clear_bss();
@@ -59,28 +54,14 @@ void kernel_main(uint64_t multiboot2_info_addr)
     fb_clear(0x000d1b2a);
     fb_set_font_scale(2);
 
-    kprintf("Initializing LAPIC... ");
-
     lapic_init(info_table.acpi_tag);
-
-    kprintf("Done.\n");
-
-    kprintf("Initializing IOAPIC... ");
 
     ioapic_init(info_table.acpi_tag);
 
-    kprintf("Done.\n");
-
-    kprintf("Configuring LAPIC timer... ");
-
     uint32_t ticks_per_ms = get_lapic_ticks_per_ms();
-
-    kprintf("Ticks per ms: %d\n", ticks_per_ms);
 
     idt_register_interrupt_handler(IDT_VECTOR_TIMER, timer_irq_handler);
     lapic_timer_start_periodic(100, ticks_per_ms, IDT_VECTOR_TIMER);
-
-    kprintf("Timer started.\n");
 
     kprintf("Initializing PS/2 Driver... ");
     if (ps2_init())
@@ -93,9 +74,6 @@ void kernel_main(uint64_t multiboot2_info_addr)
     }
 
     kprintf("Kernel Booted.\n");
-
-    thread_t* t1 = create_kernel_thread(worker_thread_test);
-    scheduler_ready(t1);
 
     while (1)
     {

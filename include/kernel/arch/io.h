@@ -34,4 +34,25 @@ static inline void wrmsr(uint32_t msr, uint64_t val)
     __asm__ volatile ("wrmsr" : : "a"(low), "d"(high), "c"(msr));
 }
 
+static inline uint64_t read_cr0(void)
+{
+    uint64_t val;
+    __asm__ volatile ("mov %%cr0, %0" : "=r"(val));
+    return val;
+}
+
+static inline uint64_t read_cr2(void)
+{
+    uint64_t val;
+    __asm__ volatile ("mov %%cr2, %0" : "=r"(val));
+    return val;
+}
+
+static inline uint64_t read_cr3(void)
+{
+    uint64_t val;
+    __asm__ volatile ("mov %%cr3, %0" : "=r"(val));
+    return val;
+}
+
 #endif

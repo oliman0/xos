@@ -1,27 +1,7 @@
 #include <kernel/panic.h>
 #include <kernel/kernel_io.h>
+#include <kernel/arch/io.h>
 #include <kernel/drivers/linear_framebuffer.h>
-
-static inline uint64_t read_cr0(void)
-{
-    uint64_t val;
-    __asm__ volatile ("mov %%cr0, %0" : "=r"(val));
-    return val;
-}
-
-static inline uint64_t read_cr2(void)
-{
-    uint64_t val;
-    __asm__ volatile ("mov %%cr2, %0" : "=r"(val));
-    return val;
-}
-
-static inline uint64_t read_cr3(void)
-{
-    uint64_t val;
-    __asm__ volatile ("mov %%cr3, %0" : "=r"(val));
-    return val;
-}
 
 void kernel_panic(const char* message, registers_t* regs)
 {

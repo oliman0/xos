@@ -4,15 +4,6 @@
 #include <kernel/mem/pmm.h>
 #include <kernel/mem/vmm.h>
 
-static inline uint64_t read_cr3(void)
-{
-    uint64_t cr3_val;
-    // 'volatile' prevents the compiler from optimizing this away
-    // '=r' tells the compiler to put the result in a general-purpose register
-    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3_val));
-    return cr3_val;
-}
-
 static uint64_t* get_or_allocate_table(uint64_t* current_table, uint32_t index)
 {
     if (current_table[index] & PAGE_PRESENT)
