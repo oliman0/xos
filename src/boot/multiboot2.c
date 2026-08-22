@@ -2,9 +2,9 @@
 #include <kernel/boot/multiboot2.h>
 
 
-multiboot_info_table_t parse_multiboot2_tags(uint64_t multiboot2_info_addr)
+multiboot_tags_t parse_multiboot2_tags(uint64_t multiboot2_info_addr)
 {
-    multiboot_info_table_t info_table = {0};
+    multiboot_tags_t info_table = {0};
 
     // Ensure pointer is non-null and 8-byte aligned
     if (!multiboot2_info_addr || (multiboot2_info_addr & 7) != 0) {

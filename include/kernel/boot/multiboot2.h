@@ -67,8 +67,8 @@ typedef struct
     multiboot_tag_framebuffer_t *framebuffer_tag;
     multiboot_tag_mmap_t *mmap_tag;
     multiboot_tag_acpi_t *acpi_tag;
-} multiboot_info_table_t;
+} multiboot_tags_t;
 
-multiboot_info_table_t parse_multiboot2_tags(uint64_t multiboot2_info_addr);
+multiboot_tags_t parse_multiboot2_tags(uint64_t multiboot2_info_addr);
 
 #endif

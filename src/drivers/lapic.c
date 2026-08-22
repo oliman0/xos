@@ -3,28 +3,10 @@
 #include <kernel/mem/vmm.h>
 #include <kernel/drivers/acpi.h>
 
-
 static uint64_t lapic_base = 0;
 static uint64_t hpet_base = 0;
 
-static inline uint32_t lapic_read(uint32_t reg)
-{
-    return *(volatile uint32_t*)(lapic_base + reg);
-}
-
-static inline void lapic_write(uint32_t reg, uint32_t val)
-{
-    *(volatile uint32_t*)(lapic_base + reg) = val;
-}
-
-static inline void hpet_write(uint64_t base, uint32_t reg, uint64_t val) {
-    *(volatile uint64_t*)(base + reg) = val;
-}
-static inline uint64_t hpet_read(uint64_t base, uint32_t reg) {
-    return *(volatile uint64_t*)(base + reg);
-}
-
-static uint32_t get_lapic_ticks_per_ms_cpuid(void)
+static uint32_t get_lapic_ticks_per_ms_cpuid()
 {
     uint32_t eax, ebx, ecx, edx;
 
@@ -51,28 +33,28 @@ static uint32_t get_lapic_ticks_per_ms_hpet()
     if (hpet_base == 0) return 0;
 
     // Period is in bits 32-63, in femtoseconds (10^-15)
-    uint32_t period = hpet_read(hpet_base, ACPI_HPET_REG_CAPABILITIES) >> 32;
+    uint32_t period = mmio_read(hpet_base, ACPI_HPET_REG_CAPABILITIES) >> 32;
 
     // We want to wait 10ms = 10^13 femtoseconds
     uint64_t ticks_to_wait = 10000000000000ULL / period;
 
     // Enable HPET counter. Bit 0 is 'overall enable'.
-    uint64_t hpet_config = hpet_read(hpet_base, ACPI_HPET_REG_CONFURATION);
-    hpet_write(hpet_base, ACPI_HPET_REG_CONFURATION, hpet_config | 1);
+    uint64_t hpet_config = mmio_read(hpet_base, ACPI_HPET_REG_CONFIGURATION);
+    mmio_write(hpet_base, ACPI_HPET_REG_CONFIGURATION, hpet_config | 1);
 
     // Set LAPIC divisor to 16
-    lapic_write(LAPIC_TDCR_REG, LAPIC_TIMER_DIV_16);
+    mmio_write(lapic_base, LAPIC_TDCR_REG, LAPIC_TIMER_DIV_16);
 
     // Initial count
     uint32_t start_lapic = 0xFFFFFFFF;
-    lapic_write(LAPIC_TICR_REG, start_lapic);
+    mmio_write(lapic_base, LAPIC_TICR_REG, start_lapic);
 
-    uint64_t hpet_start = hpet_read(hpet_base, ACPI_HPET_REG_MAIN_COUNTER);
-    while (hpet_read(hpet_base, ACPI_HPET_REG_MAIN_COUNTER) - hpet_start < ticks_to_wait) {
+    uint64_t hpet_start = mmio_read(hpet_base, ACPI_HPET_REG_MAIN_COUNTER);
+    while (mmio_read(hpet_base, ACPI_HPET_REG_MAIN_COUNTER) - hpet_start < ticks_to_wait) {
         __asm__ volatile ("pause");
     }
 
-    uint32_t end_lapic = lapic_read(LAPIC_TCCR_REG);
+    uint32_t end_lapic = mmio_read(lapic_base, LAPIC_TCCR_REG);
     uint32_t ticks_passed = start_lapic - end_lapic;
 
     return ticks_passed / 10;
@@ -92,17 +74,17 @@ uint32_t get_lapic_ticks_per_ms()
 
 void lapic_timer_start_periodic(uint32_t frequency_hz, uint32_t ticks_per_ms, uint8_t vector)
 {
-    lapic_write(LAPIC_TDCR_REG, LAPIC_TIMER_DIV_16);
+    mmio_write(lapic_base, LAPIC_TDCR_REG, LAPIC_TIMER_DIV_16);
 
-    lapic_write(LAPIC_LVT_TIMER_REG, LAPIC_TIMER_MODE_PERIODIC | vector);
+    mmio_write(lapic_base, LAPIC_LVT_TIMER_REG, LAPIC_TIMER_MODE_PERIODIC | vector);
 
     uint32_t init_count = (ticks_per_ms * 1000) / frequency_hz;
 
     // start countdown
-    lapic_write(LAPIC_TICR_REG, init_count);
+    mmio_write(lapic_base, LAPIC_TICR_REG, init_count);
 }
 
-void lapic_init(multiboot_tag_acpi_t* acpi_tag)
+void lapic_init()
 {
     uint64_t apic_msr = rdmsr(IA32_APIC_BASE_MSR);
 
@@ -130,27 +112,24 @@ void lapic_init(multiboot_tag_acpi_t* acpi_tag)
     // Map the LAPIC MMIO as uncacheable. vmm_map_page_4kb now handles huge page splitting.
     vmm_map_page_4kb(apic_phys_base, lapic_base, PAGE_WRITABLE | PAGE_UC);
 
-    if (acpi_tag) {
-        rsdp_descriptor_20_t* rsdp = (rsdp_descriptor_20_t*)acpi_tag->rsdp;
-        acpi_hpet_table_t* hpet_table = (acpi_hpet_table_t*)find_acpi_table(rsdp, "HPET");
-        if (hpet_table) {
-            uint64_t hpet_phys = hpet_table->address.address;
-            hpet_base = PHYS_TO_VIRT(hpet_phys);
-            vmm_map_page_4kb(hpet_phys, hpet_base, PAGE_WRITABLE | PAGE_UC);
-        }
+    acpi_hpet_table_t* hpet_table = (acpi_hpet_table_t*)acpi_find_table(ACPI_SIGNATURE_HPET);
+    if (hpet_table) {
+        uint64_t hpet_phys = hpet_table->address.address;
+        hpet_base = PHYS_TO_VIRT(hpet_phys);
+        vmm_map_page_4kb(hpet_phys, hpet_base, PAGE_WRITABLE | PAGE_UC);
     }
 
     // Set Task Priority Register to 0 (accept all interrupts)
-    lapic_write(LAPIC_TPR_REG, 0);
+    mmio_write(lapic_base, LAPIC_TPR_REG, 0);
 
     // Enable Local APIC in Software & assign Spurious Vector (0xFF / 255)
     // Bit 8 = Software Enable Bit
-    lapic_write(LAPIC_SVR_REG, 0x100 | 0xFF);
+    mmio_write(lapic_base, LAPIC_SVR_REG, 0x100 | 0xFF);
 
     __asm__ __volatile("sti");
 }
 
 void lapic_eoi()
 {
-    lapic_write(LAPIC_EOI_REG, 0);
+    mmio_write(lapic_base, LAPIC_EOI_REG, 0);
 }

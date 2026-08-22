@@ -15,6 +15,18 @@ static inline uint8_t inb(uint16_t port)
     return ret;
 }
 
+static inline void outw(uint16_t port, uint16_t val)
+{
+    __asm__ volatile ("outw %0, %1" : : "a"(val), "Nd"(port));
+}
+
+static inline uint16_t inw(uint16_t port)
+{
+    uint16_t ret;
+    __asm__ volatile ("inw %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
+}
+
 static inline void io_wait(void)
 {
     outb(0x80, 0); // Write to unused port 0x80 for ~1us delay
@@ -53,6 +65,16 @@ static inline uint64_t read_cr3(void)
     uint64_t val;
     __asm__ volatile ("mov %%cr3, %0" : "=r"(val));
     return val;
+}
+
+static inline void mmio_write(uint64_t base, uint32_t reg, uint64_t val)
+{
+    *(volatile uint64_t*)(base + reg) = val;
+}
+
+static inline uint64_t mmio_read(uint64_t base, uint32_t reg)
+{
+    return *(volatile uint64_t*)(base + reg);
 }
 
 #endif

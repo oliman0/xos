@@ -33,7 +33,7 @@
 
 #define CPUID_LEAF_TSC 0x15
 
-void lapic_init(multiboot_tag_acpi_t* acpi_tag);
+void lapic_init();
 void lapic_eoi();
 
 uint32_t get_lapic_ticks_per_ms();

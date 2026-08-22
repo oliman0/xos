@@ -12,6 +12,8 @@
 #include <kernel/drivers/linear_framebuffer.h>
 #include <kernel/mem/heap.h>
 
+#include "kernel/drivers/acpi.h"
+
 extern uint8_t _bss_start[];
 extern uint8_t _bss_end[];
 
@@ -41,7 +43,7 @@ void kernel_main(uint64_t multiboot2_info_addr)
 
     unmap_identity_map();
 
-    multiboot_info_table_t info_table = parse_multiboot2_tags(multiboot2_info_addr);
+    multiboot_tags_t info_table = parse_multiboot2_tags(multiboot2_info_addr);
 
     pmm_init(multiboot2_info_addr, info_table.mmap_tag);
     vmm_init();
@@ -54,7 +56,9 @@ void kernel_main(uint64_t multiboot2_info_addr)
     fb_clear(0x000d1b2a);
     fb_set_font_scale(2);
 
-    lapic_init(info_table.acpi_tag);
+    acpi_init(info_table.acpi_tag);
+
+    lapic_init();
 
     ioapic_init(info_table.acpi_tag);
 

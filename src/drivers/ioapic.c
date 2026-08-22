@@ -55,7 +55,7 @@ static void ioapic_parse_madt(acpi_madt_t* madt)
 void ioapic_init(multiboot_tag_acpi_t* acpi_tag)
 {
     rsdp_descriptor_20_t* rsdp = (rsdp_descriptor_20_t*)acpi_tag->rsdp;
-    acpi_madt_t* madt = (acpi_madt_t*)find_acpi_table(rsdp, "APIC");
+    acpi_madt_t* madt = (acpi_madt_t*)acpi_find_table(ACPI_SIGNATURE_MADT);
 
     if (madt) ioapic_parse_madt(madt);
 }
