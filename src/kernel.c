@@ -80,9 +80,16 @@ void kernel_main(uint64_t multiboot2_info_addr)
 
     kprintf("Kernel Booted.\n");
 
+    keyboard_event_t event;
     while (1)
     {
+        while (ps2_poll_keyboard(&event))
+        {
+            if (event.pressed) kprintf("%c", ascii_base_map[event.key_code]);
+        }
+
         fb_swap_buffers();
-        __asm__ volatile ("hlt");
+
+        __asm__ __volatile__ ("hlt");
     }
 }

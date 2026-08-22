@@ -32,6 +32,7 @@ add_executable(kernel.bin src/boot/boot.asm src/kernel.c
         src/switch_context.asm
         src/mem/heap.c
         src/scheduler.c
+        src/lib/ring_buffer.c
 )
 
 # Force CMake to disable position-independent code

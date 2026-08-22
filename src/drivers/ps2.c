@@ -5,89 +5,53 @@
 #include <kernel/kernel_io.h>
 #include <kernel/drivers/lapic.h>
 #include <stdbool.h>
-#include <kernel/drivers/linear_framebuffer.h>
+#include <kernel/lib/ring_buffer.h>
+#include <kernel/input.h>
 
-static bool lshift = false;
-static bool rshift = false;
+static spsc_ring_buffer_t* ring_buffer;
+static uint8_t modifiers = 0;
 
-static unsigned char kbd_us[128] =
-{
-    0,  27, '1', '2', '3', '4', '5', '6', '7', '8',	/* 9 */
-  '9', '0', '-', '=', '\b',	/* Backspace */
-  '\t',			/* Tab */
-  'q', 'w', 'e', 'r',	/* 19 */
-  't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n',	/* Enter key */
-    0,			/* 29   - Control */
-  'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';',	/* 39 */
- '\'', '`',   0,		/* Left shift */
- '\\', 'z', 'x', 'c', 'v', 'b', 'n',			/* 49 */
-  'm', ',', '.', '/',   0,				/* Right shift */
-  '*',
-    0,	/* Alt */
-  ' ',	/* Space bar */
-    0,	/* Caps lock */
-    0,	/* 59 - F1 key ... > */
-    0,   0,   0,   0,   0,   0,   0,   0,
-    0,	/* < ... F10 */
-    0,	/* 69 - Num lock*/
-    0,	/* Scroll Lock */
-    0,	/* Home key */
-    0,	/* Up Arrow */
-    0,	/* Page Up */
-  '-',
-    0,	/* Left Arrow */
-    0,
-    0,	/* Right Arrow */
-  '+',
-    0,	/* 79 - End key*/
-    0,	/* Down Arrow */
-    0,	/* Page Down */
-    0,	/* Insert Key */
-    0,	/* Delete Key */
-    0,   0,   0,
-    0,	/* F11 Key */
-    0,	/* F12 Key */
-    0,	/* All other keys are 0 */
+static const key_code_t ps2_set1_map[128] = {
+    [0x00] = KEY_NONE,
+    [0x01] = KEY_ESCAPE,
+    [0x02] = KEY_1,         [0x03] = KEY_2,         [0x04] = KEY_3,         [0x05] = KEY_4,
+    [0x06] = KEY_5,         [0x07] = KEY_6,         [0x08] = KEY_7,         [0x09] = KEY_8,
+    [0x0A] = KEY_9,         [0x0B] = KEY_0,         [0x0C] = KEY_MINUS,     [0x0D] = KEY_EQUAL,
+    [0x0E] = KEY_BACKSPACE, [0x0F] = KEY_TAB,
+    [0x10] = KEY_Q,         [0x11] = KEY_W,         [0x12] = KEY_E,         [0x13] = KEY_R,
+    [0x14] = KEY_T,         [0x15] = KEY_Y,         [0x16] = KEY_U,         [0x17] = KEY_I,
+    [0x18] = KEY_O,         [0x19] = KEY_P,         [0x1A] = KEY_LEFTBRACKET,[0x1B] = KEY_RIGHTBRACKET,
+    [0x1C] = KEY_ENTER,     [0x1D] = KEY_LCTRL,
+    [0x1E] = KEY_A,         [0x1F] = KEY_S,         [0x20] = KEY_D,         [0x21] = KEY_F,
+    [0x22] = KEY_G,         [0x23] = KEY_H,         [0x24] = KEY_J,         [0x25] = KEY_K,
+    [0x26] = KEY_L,         [0x27] = KEY_SEMICOLON, [0x28] = KEY_APOSTROPHE,[0x29] = KEY_GRAVE,
+    [0x2A] = KEY_LSHIFT,    [0x2B] = KEY_BACKSLASH,
+    [0x2C] = KEY_Z,         [0x2D] = KEY_X,         [0x2E] = KEY_C,         [0x2F] = KEY_V,
+    [0x30] = KEY_B,         [0x31] = KEY_N,         [0x32] = KEY_M,         [0x33] = KEY_COMMA,
+    [0x34] = KEY_DOT,       [0x35] = KEY_SLASH,     [0x36] = KEY_RSHIFT,    [0x37] = KEY_KP_MULTIPLY,
+    [0x38] = KEY_LALT,      [0x39] = KEY_SPACE,     [0x3A] = KEY_CAPSLOCK,
+    [0x3B] = KEY_F1,        [0x3C] = KEY_F2,        [0x3D] = KEY_F3,        [0x3E] = KEY_F4,
+    [0x3F] = KEY_F5,        [0x40] = KEY_F6,        [0x41] = KEY_F7,        [0x42] = KEY_F8,
+    [0x43] = KEY_F9,        [0x44] = KEY_F10,
+    [0x45] = KEY_NUMLOCK,   [0x46] = KEY_SCROLLLOCK,
+    [0x47] = KEY_KP_7,      [0x48] = KEY_KP_8,      [0x49] = KEY_KP_9,      [0x4A] = KEY_KP_MINUS,
+    [0x4B] = KEY_KP_4,      [0x4C] = KEY_KP_5,      [0x4D] = KEY_KP_6,      [0x4E] = KEY_KP_PLUS,
+    [0x4F] = KEY_KP_1,      [0x50] = KEY_KP_2,      [0x51] = KEY_KP_3,      [0x52] = KEY_KP_0,
+    [0x53] = KEY_KP_DECIMAL,
+    [0x57] = KEY_F11,       [0x58] = KEY_F12,
 };
 
-static unsigned char kbd_us_shift[128] =
-{
-    0,  27, '!', '@', '#', '$', '%', '^', '&', '*',	/* 9 */
-  '(', ')', '_', '+', '\b',	/* Backspace */
-  '\t',			/* Tab */
-  'Q', 'W', 'E', 'R',	/* 19 */
-  'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n',	/* Enter key */
-    0,			/* 29   - Control */
-  'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':',	/* 39 */
- '\"', '~',   0,		/* Left shift */
- '|', 'Z', 'X', 'C', 'V', 'B', 'N',			/* 49 */
-  'M', '<', '>', '?',   0,				/* Right shift */
-  '*',
-    0,	/* Alt */
-  ' ',	/* Space bar */
-    0,	/* Caps lock */
-    0,	/* 59 - F1 key ... > */
-    0,   0,   0,   0,   0,   0,   0,   0,
-    0,	/* < ... F10 */
-    0,	/* 69 - Num lock*/
-    0,	/* Scroll Lock */
-    0,	/* Home key */
-    0,	/* Up Arrow */
-    0,	/* Page Up */
-  '-',
-    0,	/* Left Arrow */
-    0,
-    0,	/* Right Arrow */
-  '+',
-    0,	/* 79 - End key*/
-    0,	/* Down Arrow */
-    0,	/* Page Down */
-    0,	/* Insert Key */
-    0,	/* Delete Key */
-    0,   0,   0,
-    0,	/* F11 Key */
-    0,	/* F12 Key */
-    0,	/* All other keys are 0 */
+// Extended PS/2 Set 1 mapping table (Evaluated when byte is preceded by 0xE0)
+static const key_code_t ps2_set1_ext_map[128] = {
+    [0x1C] = KEY_KP_ENTER,
+    [0x1D] = KEY_RCTRL,
+    [0x35] = KEY_KP_DIVIDE,
+    [0x38] = KEY_RALT,
+    [0x47] = KEY_HOME,      [0x48] = KEY_UP,        [0x49] = KEY_PAGEUP,
+    [0x4B] = KEY_LEFT,      [0x4D] = KEY_RIGHT,
+    [0x4F] = KEY_END,       [0x50] = KEY_DOWN,      [0x51] = KEY_PAGEDOWN,
+    [0x52] = KEY_INSERT,    [0x53] = KEY_DELETE,
+    [0x5B] = KEY_LMETA,     [0x5C] = KEY_RMETA,
 };
 
 static bool ps2_wait_read() {
@@ -102,51 +66,75 @@ static bool ps2_wait_write() {
     return timeout > 0;
 }
 
-static char handle_keyboard_scancode(uint8_t scancode) {
-    if (scancode == PS2_KBD_LSHIFT) {
-        lshift = true;
-        return 0;
-    } else if (scancode == (PS2_KBD_LSHIFT | PS2_KBD_RELEASE)) {
-        lshift = false;
-        return 0;
-    } else if (scancode == PS2_KBD_RSHIFT) {
-        rshift = true;
-        return 0;
-    } else if (scancode == (PS2_KBD_RSHIFT | PS2_KBD_RELEASE)) {
-        rshift = false;
-        return 0;
+static bool extended = false;
+
+static bool handle_keyboard_scancode(uint8_t scancode, key_code_t* out_key_code, bool* out_pressed) {
+    *out_pressed = !(scancode & PS2_KBD_RELEASE);
+
+    if (scancode == PS2_SCANCODE_EXTENDED)
+    {
+        extended = true;
+        return false;
     }
 
-    if (scancode & PS2_KBD_RELEASE) {
-        return 0;
+    if (extended)
+    {
+        *out_key_code = ps2_set1_ext_map[scancode & ~PS2_KBD_RELEASE];
+        extended = false;
+        return true;
     }
 
-    if (scancode < 128) {
-        return (lshift || rshift) ? kbd_us_shift[scancode] : kbd_us[scancode];
+    *out_key_code = ps2_set1_map[scancode & ~PS2_KBD_RELEASE];
+
+    return true;
+}
+
+static void update_modifier_bit(uint8_t bitmask, bool active) {
+    if (active) modifiers |= bitmask;
+    else modifiers &= ~bitmask;
+}
+
+static void process_modifers(keyboard_event_t* event)
+{
+    if (event->pressed)
+    {
+        if (event->key_code == KEY_CAPSLOCK) modifiers ^= MOD_CAPSLOCK;
+        if (event->key_code == KEY_NUMLOCK)  modifiers ^= MOD_NUMLOCK;
     }
 
-    return 0;
+    switch (event->key_code)
+    {
+        case KEY_LSHIFT: update_modifier_bit(MOD_LSHIFT, event->pressed); break;
+        case KEY_RSHIFT: update_modifier_bit(MOD_RSHIFT, event->pressed); break;
+        case KEY_LCTRL:  update_modifier_bit(MOD_LCTRL,  event->pressed); break;
+        case KEY_RCTRL:  update_modifier_bit(MOD_RCTRL,  event->pressed); break;
+        case KEY_LALT:   update_modifier_bit(MOD_LALT,   event->pressed); break;
+        case KEY_RALT:   update_modifier_bit(MOD_RALT,   event->pressed); break;
+        default: break;
+    }
 }
 
 static void keyboard_irq_handler(registers_t* regs) {
-    uint8_t scancode = inb(PS2_DATA_PORT);
-
-    char c = handle_keyboard_scancode(scancode);
-    if (c)
-    {
-        kprintf("%c", c);
+    while (inb(PS2_STATUS_PORT) & PS2_STATUS_OUTPUT_FULL) {
+        uint8_t scancode = inb(PS2_DATA_PORT);
+        spsc_ring_buffer_push(ring_buffer, &scancode);
     }
 
     lapic_eoi();
 }
 
 static void mouse_irq_handler(registers_t* regs) {
-    uint8_t data = inb(PS2_DATA_PORT);
+    while (inb(PS2_STATUS_PORT) & PS2_STATUS_OUTPUT_FULL) {
+        uint8_t data = inb(PS2_DATA_PORT);
+    }
 
     lapic_eoi();
 }
 
 bool ps2_init() {
+    ring_buffer = spsc_ring_buffer_init(256, sizeof(uint8_t));
+    if (!ring_buffer) return false;
+
     // Check if PS/2 controller exists (basic check)
     // If status register is 0xFF, it likely doesn't exist
     if (inb(PS2_STATUS_PORT) == 0xFF)
@@ -156,26 +144,30 @@ bool ps2_init() {
     }
 
     // Disable devices
+    if (!ps2_wait_write()) return false;
     outb(PS2_COMMAND_PORT, PS2_CMD_DISABLE_PORT1);
-    io_wait();
+    if (!ps2_wait_write()) return false;
     outb(PS2_COMMAND_PORT, PS2_CMD_DISABLE_PORT2);
-    io_wait();
 
     // Flush output buffer
-    int flush_timeout = PS2_IO_TIMEOUT;
-    while ((inb(PS2_STATUS_PORT) & PS2_STATUS_OUTPUT_FULL) && flush_timeout-- > 0) {
+    while (inb(PS2_STATUS_PORT) & PS2_STATUS_OUTPUT_FULL) {
         inb(PS2_DATA_PORT);
-        io_wait();
     }
 
     // Get controller configuration byte
+    if (!ps2_wait_write()) return false;
     outb(PS2_COMMAND_PORT, PS2_CMD_READ_CONFIG);
     if (!ps2_wait_read()) return false;
     uint8_t config = inb(PS2_DATA_PORT);
 
     // Check for dual channel
-    // Is Port 2 Clock Disable bit set while Port 2 disabled
-    bool dual_channel = (config & PS2_CONFIG_PORT2_CLK) != 0;
+    bool dual_channel = (config & PS2_CONFIG_PORT2_CLK) == 0;
+
+    if (dual_channel)
+    {
+        if (!ps2_wait_write()) return false;
+        outb(PS2_COMMAND_PORT, PS2_CMD_DISABLE_PORT2);
+    }
     
     // Enable interrupts for both ports (if supported) and translation
     config |= PS2_CONFIG_PORT1_INT | PS2_CONFIG_TRANSLATION;
@@ -186,17 +178,23 @@ bool ps2_init() {
     }
     
     // Set controller configuration byte
+    if (!ps2_wait_write()) return false;
     outb(PS2_COMMAND_PORT, PS2_CMD_WRITE_CONFIG);
     if (!ps2_wait_write()) return false;
     outb(PS2_DATA_PORT, config);
-    io_wait();
 
     // Enable devices
+    if (!ps2_wait_write()) return false;
     outb(PS2_COMMAND_PORT, PS2_CMD_ENABLE_PORT1);
-    io_wait();
     if (dual_channel) {
+        if (!ps2_wait_write()) return false;
         outb(PS2_COMMAND_PORT, PS2_CMD_ENABLE_PORT2);
-        io_wait();
+    }
+
+    if (!ps2_wait_write()) return false;
+    outb(PS2_DATA_PORT, PS2_ENABLE_KEYBOARD_SCANNING);
+    if (ps2_wait_read()) {
+        inb(PS2_DATA_PORT);
     }
 
     // Register handlers
@@ -204,9 +202,27 @@ bool ps2_init() {
     if (dual_channel) idt_register_interrupt_handler(IDT_VECTOR_PS2_MOUSE, mouse_irq_handler);
 
     // Configure IOAPIC
-    // We assume the BSP has LAPIC ID 0
     ioapic_set_irq(PS2_IRQ_KEYBOARD, 0, IDT_VECTOR_PS2_KEYBOARD);
     if (dual_channel) ioapic_set_irq(PS2_IRQ_MOUSE, 0, IDT_VECTOR_PS2_MOUSE);
 
     return true;
+}
+
+bool ps2_poll_keyboard(keyboard_event_t* out_event)
+{
+    uint8_t scancode;
+    key_code_t key_code;
+    bool pressed = false;
+
+    while (spsc_ring_buffer_pop(ring_buffer, &scancode)) {
+        if (handle_keyboard_scancode(scancode, &key_code, &pressed)) {
+            out_event->key_code = key_code;
+            out_event->pressed = pressed;
+            process_modifers(out_event);
+            out_event->modifiers = modifiers;
+            return true;
+        }
+    }
+
+    return false;
 }

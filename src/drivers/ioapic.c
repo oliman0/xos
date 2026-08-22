@@ -54,7 +54,6 @@ static void ioapic_parse_madt(acpi_madt_t* madt)
 
 void ioapic_init(multiboot_tag_acpi_t* acpi_tag)
 {
-    rsdp_descriptor_20_t* rsdp = (rsdp_descriptor_20_t*)acpi_tag->rsdp;
     acpi_madt_t* madt = (acpi_madt_t*)acpi_find_table(ACPI_SIGNATURE_MADT);
 
     if (madt) ioapic_parse_madt(madt);
@@ -96,6 +95,7 @@ void ioapic_set_irq(uint8_t irq, uint64_t apic_id, uint8_t vector)
     
     uint32_t high = (uint32_t)(apic_id << IOAPIC_REDTBL_DEST_SHIFT);
 
-    ioapic_write(IOAPIC_REG_REDTBL + gsi * 2, low);
+    ioapic_write(IOAPIC_REG_REDTBL + gsi * 2, low | (1 << 16)); // Write masked
     ioapic_write(IOAPIC_REG_REDTBL + gsi * 2 + 1, high);
+    ioapic_write(IOAPIC_REG_REDTBL + gsi * 2, low);             // Unmask
 }

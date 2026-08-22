@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#include "kernel/input.h"
+
 #define PS2_DATA_PORT 0x60
 #define PS2_STATUS_PORT 0x64
 #define PS2_COMMAND_PORT 0x64
@@ -26,6 +28,8 @@
 #define PS2_CONFIG_PORT2_CLK (1 << 5)
 #define PS2_CONFIG_TRANSLATION (1 << 6)
 
+#define PS2_ENABLE_KEYBOARD_SCANNING 0xF4
+
 #define PS2_IRQ_KEYBOARD 1
 #define PS2_IRQ_MOUSE 12
 
@@ -33,8 +37,12 @@
 #define PS2_KBD_RSHIFT 0x36
 #define PS2_KBD_RELEASE 0x80
 
+#define PS2_SCANCODE_EXTENDED 0xE0
+
 #define PS2_IO_TIMEOUT 10000
 
 bool ps2_init();
+
+bool ps2_poll_keyboard(keyboard_event_t* out_event);
 
 #endif
