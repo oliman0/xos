@@ -67,14 +67,24 @@ static inline uint64_t read_cr3(void)
     return val;
 }
 
-static inline void mmio_write(uint64_t base, uint32_t reg, uint64_t val)
+static inline void mmio_write64(uint64_t base, uint32_t reg, uint64_t val)
 {
     *(volatile uint64_t*)(base + reg) = val;
 }
 
-static inline uint64_t mmio_read(uint64_t base, uint32_t reg)
+static inline uint64_t mmio_read64(uint64_t base, uint32_t reg)
 {
     return *(volatile uint64_t*)(base + reg);
+}
+
+static inline uint32_t mmio_read32(uint64_t base, uint32_t reg)
+{
+    return *(volatile uint32_t*)(base + reg);
+}
+
+static inline void mmio_write32(uint64_t base, uint32_t reg, uint32_t value)
+{
+    *(volatile uint32_t*)(base + reg) = value;
 }
 
 #endif

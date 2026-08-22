@@ -3,7 +3,6 @@
 #include <kernel/kernel_io.h>
 #include <kernel/panic.h>
 #include <kernel/drivers/lapic.h>
-#include <kernel/drivers/linear_framebuffer.h>
 #include <kernel/lib/string.h>
 
 static idt_entry_t idt[IDT_ENTRIES] __attribute__((aligned(16)));

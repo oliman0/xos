@@ -33,28 +33,29 @@ static uint32_t get_lapic_ticks_per_ms_hpet()
     if (hpet_base == 0) return 0;
 
     // Period is in bits 32-63, in femtoseconds (10^-15)
-    uint32_t period = mmio_read(hpet_base, ACPI_HPET_REG_CAPABILITIES) >> 32;
+    uint32_t period = (uint32_t)(mmio_read64(hpet_base, ACPI_HPET_REG_CAPABILITIES) >> 32);
+    if (period == 0) return 0;
 
     // We want to wait 10ms = 10^13 femtoseconds
     uint64_t ticks_to_wait = 10000000000000ULL / period;
 
     // Enable HPET counter. Bit 0 is 'overall enable'.
-    uint64_t hpet_config = mmio_read(hpet_base, ACPI_HPET_REG_CONFIGURATION);
-    mmio_write(hpet_base, ACPI_HPET_REG_CONFIGURATION, hpet_config | 1);
+    uint64_t hpet_config = mmio_read64(hpet_base, ACPI_HPET_REG_CONFIGURATION);
+    mmio_write32(hpet_base, ACPI_HPET_REG_CONFIGURATION, hpet_config | 1);
 
     // Set LAPIC divisor to 16
-    mmio_write(lapic_base, LAPIC_TDCR_REG, LAPIC_TIMER_DIV_16);
+    mmio_write32(lapic_base, LAPIC_TDCR_REG, LAPIC_TIMER_DIV_16);
 
     // Initial count
     uint32_t start_lapic = 0xFFFFFFFF;
-    mmio_write(lapic_base, LAPIC_TICR_REG, start_lapic);
+    mmio_write32(lapic_base, LAPIC_TICR_REG, start_lapic);
 
-    uint64_t hpet_start = mmio_read(hpet_base, ACPI_HPET_REG_MAIN_COUNTER);
-    while (mmio_read(hpet_base, ACPI_HPET_REG_MAIN_COUNTER) - hpet_start < ticks_to_wait) {
+    uint64_t hpet_start = mmio_read64(hpet_base, ACPI_HPET_REG_MAIN_COUNTER);
+    while (mmio_read64(hpet_base, ACPI_HPET_REG_MAIN_COUNTER) - hpet_start < ticks_to_wait) {
         __asm__ volatile ("pause");
     }
 
-    uint32_t end_lapic = mmio_read(lapic_base, LAPIC_TCCR_REG);
+    uint32_t end_lapic = mmio_read32(lapic_base, LAPIC_TCCR_REG);
     uint32_t ticks_passed = start_lapic - end_lapic;
 
     return ticks_passed / 10;
@@ -74,14 +75,14 @@ uint32_t get_lapic_ticks_per_ms()
 
 void lapic_timer_start_periodic(uint32_t frequency_hz, uint32_t ticks_per_ms, uint8_t vector)
 {
-    mmio_write(lapic_base, LAPIC_TDCR_REG, LAPIC_TIMER_DIV_16);
+    mmio_write32(lapic_base, LAPIC_TDCR_REG, LAPIC_TIMER_DIV_16);
 
-    mmio_write(lapic_base, LAPIC_LVT_TIMER_REG, LAPIC_TIMER_MODE_PERIODIC | vector);
+    mmio_write32(lapic_base, LAPIC_LVT_TIMER_REG, LAPIC_TIMER_MODE_PERIODIC | vector);
 
     uint32_t init_count = (ticks_per_ms * 1000) / frequency_hz;
 
     // start countdown
-    mmio_write(lapic_base, LAPIC_TICR_REG, init_count);
+    mmio_write32(lapic_base, LAPIC_TICR_REG, init_count);
 }
 
 void lapic_init()
@@ -120,16 +121,16 @@ void lapic_init()
     }
 
     // Set Task Priority Register to 0 (accept all interrupts)
-    mmio_write(lapic_base, LAPIC_TPR_REG, 0);
+    mmio_write32(lapic_base, LAPIC_TPR_REG, 0);
 
     // Enable Local APIC in Software & assign Spurious Vector (0xFF / 255)
     // Bit 8 = Software Enable Bit
-    mmio_write(lapic_base, LAPIC_SVR_REG, 0x100 | 0xFF);
+    mmio_write32(lapic_base, LAPIC_SVR_REG, 0x100 | 0xFF);
 
     __asm__ __volatile("sti");
 }
 
 void lapic_eoi()
 {
-    mmio_write(lapic_base, LAPIC_EOI_REG, 0);
+    mmio_write32(lapic_base, LAPIC_EOI_REG, 0);
 }

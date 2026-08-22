@@ -2,8 +2,7 @@
 #define XOS_ACPI_H
 
 #include <stdint.h>
-
-#include "kernel/boot/multiboot2.h"
+#include <kernel/boot/multiboot2.h>
 
 typedef enum
 {

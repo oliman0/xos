@@ -11,8 +11,7 @@
 #include <kernel/drivers/ps2.h>
 #include <kernel/drivers/linear_framebuffer.h>
 #include <kernel/mem/heap.h>
-
-#include "kernel/drivers/acpi.h"
+#include <kernel/drivers/acpi.h>
 
 extern uint8_t _bss_start[];
 extern uint8_t _bss_end[];
@@ -63,6 +62,8 @@ void kernel_main(uint64_t multiboot2_info_addr)
     ioapic_init(info_table.acpi_tag);
 
     uint32_t ticks_per_ms = get_lapic_ticks_per_ms();
+
+    kprintf("Timer tpms: %d\n", ticks_per_ms);
 
     idt_register_interrupt_handler(IDT_VECTOR_TIMER, timer_irq_handler);
     lapic_timer_start_periodic(100, ticks_per_ms, IDT_VECTOR_TIMER);

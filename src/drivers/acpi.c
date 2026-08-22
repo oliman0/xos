@@ -2,8 +2,7 @@
 #include <kernel/lib/string.h>
 #include <kernel/mem/vmm.h>
 #include <stdbool.h>
-
-#include "kernel/arch/io.h"
+#include <kernel/arch/io.h>
 
 static rsdp_descriptor_20_t* rsdp;
 
@@ -25,7 +24,7 @@ void acpi_init(multiboot_tag_acpi_t* acpi_tag)
     rsdp = (rsdp_descriptor_20_t*)acpi_tag->rsdp;
 }
 
-static const char* acpi_enum_to_signature[3] = { "ACPI", "HPET", "FACP" };
+static const char* acpi_enum_to_signature[3] = { "APIC", "HPET", "FACP" };
 
 acpi_header_t* acpi_find_table(acpi_table_signature_t signature)
 {
