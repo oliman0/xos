@@ -6,6 +6,11 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_FLAGS "-m64 -mcmodel=kernel -ffreestanding -fno-builtin -fno-stack-protector -mno-red-zone -fno-pie -Wall -Wextra")
 set(CMAKE_ASM_NASM_FLAGS "-f elf64")
 
+set(GRUB_BIN "grub2-mkrescue")
+set(OVMF_BIN "/usr/share/edk2/ovmf/OVMF_CODE.fd")
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 include_directories(include)
 
 # Define executable target
@@ -33,6 +38,7 @@ add_executable(kernel.bin src/boot/boot.asm src/kernel.c
         src/mem/heap.c
         src/scheduler.c
         src/lib/ring_buffer.c
+        src/lib/semaphore.c
 )
 
 # Force CMake to disable position-independent code
@@ -51,7 +57,7 @@ target_link_options(kernel.bin PRIVATE
 add_custom_target(iso
         COMMAND ${CMAKE_COMMAND} -E make_directory iso/boot/grub
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:kernel.bin> iso/boot/kernel.bin
-        COMMAND grub-mkrescue -o kernel.iso iso
+        COMMAND ${GRUB_BIN} -o kernel.iso iso
         DEPENDS kernel.bin        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "Building bootable GRUB ISO..."
 )
@@ -64,7 +70,7 @@ configure_file(
 
 # Launch QEMU with the GRUB ISO
 add_custom_target(run
-        COMMAND qemu-system-x86_64 -bios /usr/share/ovmf/OVMF.fd -cdrom kernel.iso -no-reboot -M smm=off -serial stdio
+        COMMAND qemu-system-x86_64 -bios ${OVMF_BIN} -cdrom kernel.iso -no-reboot -M smm=off -serial stdio
         DEPENDS iso
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "Booting ISO in QEMU..."

@@ -3,6 +3,7 @@
 #include <kernel/drivers/lapic.h>
 #include <kernel/mem/heap.h>
 #include <kernel/mem/vmm.h>
+#include <kernel/arch/intr.h>
 
 static thread_t* current_thread = NULL;
 static thread_t* ready_queue_head = NULL;
@@ -29,12 +30,7 @@ static void clear_dead_threads()
     {
         thread_t* next = curr->next;
 
-        if (curr->stack_base)
-        {
-            vmm_free_unmap_range((uint64_t)curr->stack_base, THREAD_STACK_SIZE);
-        }
-
-        kfree(curr);
+        free_kernel_thread(curr);
 
         curr = next;
     }
@@ -48,6 +44,18 @@ void scheduler_init()
     main_thread->state = THREAD_RUNNING;
     main_thread->stack_base = NULL;
     main_thread->next = NULL;
+
+    main_thread->wait_queue_node = kmalloc(sizeof(wait_queue_node_t));
+    if (main_thread->wait_queue_node == NULL) {
+        kfree(main_thread);
+        return;
+    }
+
+    main_thread->wait_queue_node->thread = main_thread;
+    main_thread->wait_queue_node->next = NULL;
+    main_thread->wait_queue_node->state = NODE_WAITING;
+    main_thread->wait_queue_node->requested_count = 0;
+
     current_thread = main_thread;
 
     idle_thread = create_kernel_thread(idle_thread_func);
@@ -55,10 +63,11 @@ void scheduler_init()
 
 void scheduler_ready(thread_t* thread)
 {
-    if (!thread || thread == idle_thread) return;
+    if (thread == NULL || thread == idle_thread ||
+        thread->state == THREAD_READY) return;
 
     uint64_t flags;
-    __asm__ volatile("pushfq; pop %0; cli" : "=r"(flags) :: "memory");
+    disable_interrupts(&flags);
 
     thread->state = THREAD_READY;
     thread->next = NULL;
@@ -74,8 +83,7 @@ void scheduler_ready(thread_t* thread)
         ready_queue_tail = thread;
     }
 
-    if (flags & (1 << 9))
-        __asm__ volatile("sti" ::: "memory");
+    enable_interrupts(flags);
 }
 
 void thread_exit()
@@ -95,9 +103,10 @@ void scheduler_preempt(registers_t* regs)
 
     clear_dead_threads();
 
+    current_thread->rsp = (uint64_t*)regs;
+
     if (current_thread->state == THREAD_RUNNING)
     {
-        current_thread->rsp = (uint64_t*)regs;
         if (current_thread != idle_thread)
         {
             scheduler_ready(current_thread);
@@ -129,4 +138,9 @@ void scheduler_preempt(registers_t* regs)
     current_thread = next_thread;
 
     switch_to_thread(current_thread->rsp);
+}
+
+thread_t* scheduler_current_thread()
+{
+    return current_thread;
 }

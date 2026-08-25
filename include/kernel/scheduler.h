@@ -13,4 +13,6 @@ void scheduler_yield();
 
 void scheduler_preempt(registers_t* regs);
 
+thread_t* scheduler_current_thread();
+
 #endif

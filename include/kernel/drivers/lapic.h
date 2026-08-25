@@ -36,7 +36,10 @@
 void lapic_init();
 void lapic_eoi();
 
-uint32_t get_lapic_ticks_per_ms();
+uint32_t lapic_get_ticks_per_ms();
 void lapic_timer_start_periodic(uint32_t frequency_hz, uint32_t ticks_per_ms, uint8_t vector);
+
+uint64_t lapic_ms_to_ticks(uint64_t ms);
+uint64_t lapic_get_kernel_ticks();
 
 #endif

@@ -24,13 +24,6 @@ void clear_bss(void)
     }
 }
 
-void timer_irq_handler(registers_t* regs)
-{
-    lapic_eoi();
-
-    scheduler_preempt(regs);
-}
-
 void kernel_main(uint64_t multiboot2_info_addr)
 {
     clear_bss();
@@ -61,12 +54,11 @@ void kernel_main(uint64_t multiboot2_info_addr)
 
     ioapic_init(info_table.acpi_tag);
 
-    uint32_t ticks_per_ms = get_lapic_ticks_per_ms();
+    uint32_t ticks_per_ms = lapic_get_ticks_per_ms();
 
     kprintf("Timer tpms: %d\n", ticks_per_ms);
 
-    idt_register_interrupt_handler(IDT_VECTOR_TIMER, timer_irq_handler);
-    lapic_timer_start_periodic(100, ticks_per_ms, IDT_VECTOR_TIMER);
+    lapic_timer_start_periodic(1000, ticks_per_ms, IDT_VECTOR_TIMER);
 
     kprintf("Initializing PS/2 Driver... ");
     if (ps2_init())

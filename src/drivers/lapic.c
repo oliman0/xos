@@ -2,9 +2,23 @@
 #include <kernel/arch/io.h>
 #include <kernel/mem/vmm.h>
 #include <kernel/drivers/acpi.h>
+#include <kernel/scheduler.h>
+#include <kernel/idt.h>
 
 static uint64_t lapic_base = 0;
 static uint64_t hpet_base = 0;
+
+static uint32_t timer_frequency_hz = 0;
+static uint64_t kernel_ticks = 0;
+
+void timer_irq_handler(registers_t* regs)
+{
+    kernel_ticks++;
+
+    lapic_eoi();
+
+    scheduler_preempt(regs);
+}
 
 static uint32_t get_lapic_ticks_per_ms_cpuid()
 {
@@ -61,7 +75,7 @@ static uint32_t get_lapic_ticks_per_ms_hpet()
     return ticks_passed / 10;
 }
 
-uint32_t get_lapic_ticks_per_ms()
+uint32_t lapic_get_ticks_per_ms()
 {
     uint32_t freq = get_lapic_ticks_per_ms_cpuid();
 
@@ -75,6 +89,8 @@ uint32_t get_lapic_ticks_per_ms()
 
 void lapic_timer_start_periodic(uint32_t frequency_hz, uint32_t ticks_per_ms, uint8_t vector)
 {
+    timer_frequency_hz = frequency_hz;
+
     mmio_write32(lapic_base, LAPIC_TDCR_REG, LAPIC_TIMER_DIV_16);
 
     mmio_write32(lapic_base, LAPIC_LVT_TIMER_REG, LAPIC_TIMER_MODE_PERIODIC | vector);
@@ -128,9 +144,21 @@ void lapic_init()
     mmio_write32(lapic_base, LAPIC_SVR_REG, 0x100 | 0xFF);
 
     __asm__ __volatile("sti");
+
+    idt_register_interrupt_handler(IDT_VECTOR_TIMER, timer_irq_handler);
 }
 
 void lapic_eoi()
 {
     mmio_write32(lapic_base, LAPIC_EOI_REG, 0);
+}
+
+uint64_t lapic_get_kernel_ticks()
+{
+    return kernel_ticks;
+}
+
+uint64_t lapic_ms_to_ticks(uint64_t ms)
+{
+    return ms * (timer_frequency_hz / 1000);
 }

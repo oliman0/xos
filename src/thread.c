@@ -50,9 +50,38 @@ thread_t* create_kernel_thread(void (*entry_point)())
     // Initialize thread structure
     thread->rsp = (uint64_t*)regs;
     thread->id = next_thread_id++;
-    thread->state = THREAD_READY;
+    thread->state = THREAD_DEAD;
     thread->stack_base = (void*)stack_base;
     thread->next = NULL;
 
+    thread->wait_queue_node = kmalloc(sizeof(wait_queue_node_t));
+    if (!thread->wait_queue_node) {
+        kfree(thread);
+        return NULL;
+    }
+
+    thread->wait_queue_node->thread = thread;
+    thread->wait_queue_node->next = NULL;
+    thread->wait_queue_node->state = NODE_WAITING;
+    thread->wait_queue_node->requested_count = 0;
+
     return thread;
+}
+
+void free_kernel_thread(thread_t* thread)
+{
+    if (!thread) return;
+
+    // Free the stack
+    if (thread->stack_base) {
+        vmm_free_unmap_range((uint64_t)thread->stack_base, THREAD_STACK_SIZE);
+    }
+
+    // Free the wait queue node
+    if (thread->wait_queue_node) {
+        kfree(thread->wait_queue_node);
+    }
+
+    // Free the thread structure
+    kfree(thread);
 }
