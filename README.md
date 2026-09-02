@@ -17,6 +17,6 @@ sudo apt install -y build-essential nasm xorriso grub-pc-bin grub-common qemu-sy
 ### dnf:
 ```bash
 sudo dnf update
-sudo dnf groupinstall -y "Development Tools"
+sudo dnf install @development-tools
 sudo dnf install -y nasm xorriso grub2-pc grub2-tools grub2-tools-extra qemu-system-x86 cmake gdb grub2-efi-x64 mtools dosfstools
 ```
