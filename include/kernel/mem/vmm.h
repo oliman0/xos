@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-
+#define PAGE_TABLE_ENTRIES 512
 
 // The virtual base for the Direct Physical Map (PML4 Entry 256)
 #define DIRECT_MAP_BASE 0xFFFF800000000000ULL
@@ -21,7 +21,7 @@
 #define PAGE_GLOBAL        (1ull << 8)
 #define PAGE_NX            (1ull << 63)
 
-#define PAGE_WC            (PAGE_CACHE_DISABLE)
+#define PAGE_WC            (PAGE_WRITE_THROUGH)
 #define PAGE_UC            (PAGE_CACHE_DISABLE | PAGE_WRITE_THROUGH)
 
 #define IA32_PAT_MSR       0x277
@@ -59,6 +59,9 @@ void vmm_alloc_map_range(uint64_t virt_addr, size_t size, uint64_t flags);
 uint64_t vmm_unmap_page_2mb(uint64_t virt_addr);
 uint64_t vmm_unmap_page_4kb(uint64_t virt_addr);
 
+// virt_addr must be page aligned 
 void vmm_free_unmap_range(uint64_t virt_addr, size_t size);
+// virt_addr must be page aligned 
+void vmm_unmap_range(uint64_t virt_addr, size_t size);
 
 #endif
