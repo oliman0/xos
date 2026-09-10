@@ -25,10 +25,14 @@ thread_t* create_kernel_thread(void (*entry_point)())
     thread_t* thread = kmalloc(sizeof(thread_t));
     if (!thread) return NULL;
 
+    // Unmap the guard page if previously mapped
+    // Otherwise unmap just returns
+    vmm_free_unmap_range(next_stack_addr, THREAD_STACK_GUARD_SIZE);
+
     // Allocate, map and initialize the stack
-    uint64_t stack_base = next_stack_addr;
-    next_stack_addr += THREAD_STACK_SIZE;
-    vmm_alloc_map_range(stack_base, THREAD_STACK_SIZE, PAGE_WRITABLE);
+    uint64_t stack_base = next_stack_addr + THREAD_STACK_GUARD_SIZE;
+    next_stack_addr += THREAD_STACK_SIZE + THREAD_STACK_GUARD_SIZE;
+    vmm_alloc_map_range(stack_base, THREAD_STACK_SIZE, PAGE_WRITABLE | PAGE_NX);
     memset((void*)stack_base, 0, THREAD_STACK_SIZE);
 
     // Prepare the register frame at the top of the stack
@@ -57,6 +61,10 @@ thread_t* create_kernel_thread(void (*entry_point)())
     thread->wait_queue_node = kmalloc(sizeof(wait_queue_node_t));
     if (!thread->wait_queue_node) {
         kfree(thread);
+
+        vmm_free_unmap_range(stack_base, THREAD_STACK_SIZE);
+        next_stack_addr -= THREAD_STACK_SIZE + THREAD_STACK_GUARD_SIZE;
+
         return NULL;
     }
 

@@ -132,7 +132,7 @@ enable_paging:
 
     mov ecx, 0xC0000080
     rdmsr
-    or eax, 1 << 8               ; Enable Long Mode
+    or eax, (1 << 8) | (1 << 11) ; Enable Long Mode & NXE
     wrmsr
 
     mov eax, cr0
@@ -191,8 +191,10 @@ dbg_play_beep:
     out 0x61, al
     ret
 
-section .setup_stack nobits
+section .init.stack nobits
 align 16
+global stack_guard
+stack_guard: resb 4096
 stack_bottom: resb 16384
 global stack_top
 stack_top:
@@ -200,7 +202,7 @@ stack_top:
 section .bss
 
 section .rodata
-align 8
+align 4096
 gdt64:
     dq 0
 .code: equ $ - gdt64

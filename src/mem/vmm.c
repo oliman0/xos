@@ -9,7 +9,7 @@
 
 static uint64_t split_huge_page(uint64_t* current_table, uint32_t index)
 {
-    if (!(current_table[index] & PAGE_PRESENT) || !(current_table[index] & PAGE_HUGE)) return NULL;
+    if (!(current_table[index] & PAGE_PRESENT) || !(current_table[index] & PAGE_HUGE)) return 0;
 
     // Split the 2MB huge page into 512 x 4KB pages
     uint64_t huge_phys = current_table[index] & PHYS_ADDR_MASK;
@@ -17,7 +17,7 @@ static uint64_t split_huge_page(uint64_t* current_table, uint32_t index)
     huge_flags &= ~PAGE_HUGE;
 
     uint64_t new_table_phys = pmm_alloc_frame();
-    if (new_table_phys == 0) return NULL;
+    if (new_table_phys == 0) return 0;
 
     uint64_t* new_table_virt = (uint64_t*)PHYS_TO_VIRT(new_table_phys);
     for (int i = 0; i < HUGE_PAGE_FRAME_COUNT; i++)
@@ -323,6 +323,9 @@ void vmm_init()
     // Reload CR3 to flush entire TLB after bulk initialization
     uint64_t cr3 = read_cr3();
     __asm__ volatile("mov %0, %%cr3" :: "r"(cr3) : "memory");
+
+    // Unmap kernel stack guard page
+    vmm_unmap_range((uint64_t)stack_guard, PAGE_SIZE);
 }
 
 void vmm_map_page_2mb(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags)

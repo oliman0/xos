@@ -31,8 +31,8 @@ SECTIONS
         *(.data)
     }
 
-    .setup_stack ALIGN(16) (NOLOAD) : AT(ADDR(.setup_stack) - KERNEL_VMA) {
-        *(.setup_stack)
+    .init.stack ALIGN(4K) (NOLOAD) : AT(ADDR(.init.stack) - KERNEL_VMA) {
+        *(.init.stack)
     }
 
     .bss ALIGN(4K) : AT(ADDR(.bss) - KERNEL_VMA)

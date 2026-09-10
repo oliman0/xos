@@ -46,6 +46,7 @@
 #define PHYS_TO_VIRT(phys_addr) ((phys_addr) + DIRECT_MAP_BASE)
 
 extern uint64_t pml4[];
+extern uint64_t stack_guard[];
 
 void vmm_init();
 void unmap_identity_map();

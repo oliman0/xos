@@ -4,8 +4,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include <kernel/mem/pmm.h>
+
 #define THREAD_STACK_BASE 0xFFFFB00000000000ULL
 #define THREAD_STACK_SIZE 0x4000
+#define THREAD_STACK_GUARD_SIZE PAGE_SIZE
 
 typedef enum {
     THREAD_READY,
