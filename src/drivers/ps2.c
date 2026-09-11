@@ -1,3 +1,4 @@
+#include "kernel/drivers/acpi.h"
 #include <kernel/drivers/ps2.h>
 #include <kernel/drivers/ioapic.h>
 #include <kernel/arch/io.h>
@@ -7,6 +8,8 @@
 #include <stdbool.h>
 #include <kernel/lib/ring_buffer.h>
 #include <kernel/input.h>
+#include <stdint.h>
+#include <sys/types.h>
 
 static spsc_ring_buffer_t* ring_buffer;
 static uint8_t modifiers = 0;
@@ -55,15 +58,15 @@ static const key_code_t ps2_set1_ext_map[128] = {
 };
 
 static bool ps2_wait_read() {
-    int timeout = PS2_IO_TIMEOUT;
-    while (!(inb(PS2_STATUS_PORT) & PS2_STATUS_OUTPUT_FULL) && timeout-- > 0);
-    return timeout > 0;
+    uint64_t timeout = lapic_get_kernel_ticks() + PS2_IO_TIMEOUT;
+    while (!(inb(PS2_STATUS_PORT) & PS2_STATUS_OUTPUT_FULL) && lapic_get_kernel_ticks() < timeout);
+    return lapic_get_kernel_ticks() < timeout;
 }
 
 static bool ps2_wait_write() {
-    int timeout = PS2_IO_TIMEOUT;
-    while ((inb(PS2_STATUS_PORT) & PS2_STATUS_INPUT_FULL) && timeout-- > 0);
-    return timeout > 0;
+    uint64_t timeout = lapic_get_kernel_ticks() + PS2_IO_TIMEOUT;
+    while ((inb(PS2_STATUS_PORT) & PS2_STATUS_INPUT_FULL) && lapic_get_kernel_ticks() < timeout);
+    return lapic_get_kernel_ticks() < timeout;
 }
 
 static bool extended = false;
@@ -115,7 +118,14 @@ static void process_modifers(keyboard_event_t* event)
 }
 
 static void keyboard_irq_handler(registers_t* regs) {
-    while (inb(PS2_STATUS_PORT) & PS2_STATUS_OUTPUT_FULL) {
+    while (1)
+    {
+        uint8_t status = inb(PS2_STATUS_PORT);
+
+        if (!(status & PS2_STATUS_OUTPUT_FULL)) break;
+
+        if (status & PS2_STATUS_AUX_DATA) break;
+
         uint8_t scancode = inb(PS2_DATA_PORT);
         spsc_ring_buffer_push(ring_buffer, &scancode);
     }
@@ -124,22 +134,42 @@ static void keyboard_irq_handler(registers_t* regs) {
 }
 
 static void mouse_irq_handler(registers_t* regs) {
-    while (inb(PS2_STATUS_PORT) & PS2_STATUS_OUTPUT_FULL) {
+    while (1)
+    {
+        uint8_t status = inb(PS2_STATUS_PORT);
+
+        if (!(status & PS2_STATUS_OUTPUT_FULL)) break;
+
+        if (!(status & PS2_STATUS_AUX_DATA)) break;
+
         uint8_t data = inb(PS2_DATA_PORT);
     }
 
     lapic_eoi();
 }
 
-bool ps2_init() {
+bool ps2_init() 
+{
+    kprintf("Initializing PS/2 Driver...\n");
+
     ring_buffer = spsc_ring_buffer_init(256, sizeof(uint8_t));
     if (!ring_buffer) return false;
 
-    // Check if PS/2 controller exists (basic check)
-    // If status register is 0xFF, it likely doesn't exist
-    if (inb(PS2_STATUS_PORT) == 0xFF)
+    // Check if the i8042 controller exsists
+    bool i8042_present = true;
+
+    acpi_fadt_t* fadt = (acpi_fadt_t*)acpi_find_table(ACPI_SIGNATURE_FADT);
+    if (fadt == NULL) return false;
+
+    // Check bit 1 (value 0x02) of the iapc boot arch flags (i8042 flag)
+    if (fadt->header.revision >= 2)
     {
-        kprintf("PS/2 Controller not found. ");
+        i8042_present = (fadt->boot_architecture_flags & ACPI_FADT_IAPC_8042_FLAG) != 0;
+    }
+
+    if (!i8042_present)
+    {
+        kprintf("   8042 controller not present\n");
         return false;
     }
 
@@ -154,36 +184,91 @@ bool ps2_init() {
         inb(PS2_DATA_PORT);
     }
 
-    // Get controller configuration byte
+    // Perform self test
+    if (!ps2_wait_write()) return false;
+    outb(PS2_COMMAND_PORT, PS2_CMD_SELF_TEST);
+    if (!ps2_wait_read()) return false;
+    uint8_t test_response = inb(PS2_DATA_PORT);
+
+    if (test_response != PS2_SELF_TEST_SUCCESS)
+    {
+        kprintf("   Controller Self Test Fail: %x ", test_response);
+        return false;
+    }
+
+    // Read config byte
     if (!ps2_wait_write()) return false;
     outb(PS2_COMMAND_PORT, PS2_CMD_READ_CONFIG);
     if (!ps2_wait_read()) return false;
     uint8_t config = inb(PS2_DATA_PORT);
 
-    // Check for dual channel
-    bool dual_channel = (config & PS2_CONFIG_PORT2_CLK) == 0;
-
-    if (dual_channel)
-    {
-        if (!ps2_wait_write()) return false;
-        outb(PS2_COMMAND_PORT, PS2_CMD_DISABLE_PORT2);
-    }
-    
-    // Enable interrupts for both ports (if supported) and translation
-    config |= PS2_CONFIG_PORT1_INT | PS2_CONFIG_TRANSLATION;
+    // Configure port 1 and write config byte
+    config |= PS2_CONFIG_TRANSLATION;
+    config &= ~PS2_CONFIG_PORT1_INT;
     config &= ~PS2_CONFIG_PORT1_CLK;
-    if (dual_channel) {
-        config |= PS2_CONFIG_PORT2_INT;
-        config &= ~PS2_CONFIG_PORT2_CLK;
-    }
-    
-    // Set controller configuration byte
+
     if (!ps2_wait_write()) return false;
     outb(PS2_COMMAND_PORT, PS2_CMD_WRITE_CONFIG);
     if (!ps2_wait_write()) return false;
     outb(PS2_DATA_PORT, config);
 
-    // Enable devices
+    // Test dual channel
+    bool dual_channel = false;
+
+    if (!ps2_wait_write()) return false;
+    outb(PS2_COMMAND_PORT, PS2_CMD_ENABLE_PORT2);
+    if (!ps2_wait_write()) return false;
+    outb(PS2_COMMAND_PORT, PS2_CMD_READ_CONFIG);
+    if (!ps2_wait_read()) return false;
+    config = inb(PS2_DATA_PORT);
+
+    dual_channel = !(config & PS2_CONFIG_PORT2_CLK);
+
+    // If dual channel disable port 2 then write config byte
+    if (dual_channel)
+    {
+        kprintf("   Dual Channel\n");
+
+        if (!ps2_wait_write()) return false;
+        outb(PS2_COMMAND_PORT, PS2_CMD_DISABLE_PORT2);
+
+        config &= ~PS2_CONFIG_PORT2_INT;
+        config &= ~PS2_CONFIG_PORT2_CLK;
+
+        if (!ps2_wait_write()) return false;
+        outb(PS2_COMMAND_PORT, PS2_CMD_WRITE_CONFIG);
+        if (!ps2_wait_write()) return false;
+        outb(PS2_DATA_PORT, config);
+    }
+
+    // Test PS/2 port 1
+    if (!ps2_wait_write()) return false;
+    outb(PS2_COMMAND_PORT, PS2_CMD_TEST_PORT1);
+    if (!ps2_wait_read()) return false;
+    test_response = inb(PS2_DATA_PORT);
+
+    if (test_response != PS2_PORT_TEST_SUCCESS)
+    {
+        kprintf("   Port 1 Test Fail: %x\n", test_response);
+        return false;
+    }
+
+    // Test PS/2 port 2
+    if (dual_channel)
+    {
+        if (!ps2_wait_write()) return false;
+        outb(PS2_COMMAND_PORT, PS2_CMD_TEST_PORT2);
+        if (!ps2_wait_read()) return false;
+        test_response = inb(PS2_DATA_PORT);
+
+        if (test_response != PS2_PORT_TEST_SUCCESS)
+        {
+            kprintf("   Port 2 Test Fail: %x\n", test_response);
+            return false;
+        }
+    }
+
+    // Enable Devices
     if (!ps2_wait_write()) return false;
     outb(PS2_COMMAND_PORT, PS2_CMD_ENABLE_PORT1);
     if (dual_channel) {
@@ -191,6 +276,63 @@ bool ps2_init() {
         outb(PS2_COMMAND_PORT, PS2_CMD_ENABLE_PORT2);
     }
 
+    // Reset Devices
+    if (!ps2_wait_write()) return false;
+    outb(PS2_DATA_PORT, PS2_DEV_RESET);
+    if (!ps2_wait_read()) return false;
+    uint8_t ack = inb(PS2_DATA_PORT);
+
+    if (ack != PS2_ACK)
+    {
+        kprintf("   Port 1 Expected ACK: %x\n", ack);
+        return false;
+    }
+
+    if (!ps2_wait_read()) return false;
+    test_response = inb(PS2_DATA_PORT);
+
+    if (test_response != PS2_DEV_BAT_SUCCESS)
+    {
+        kprintf("   Port 1 BAT Fail: %x\n", test_response);
+        return false;
+    }
+
+    if (dual_channel)
+    {
+        if (!ps2_wait_write()) return false;
+        outb(PS2_COMMAND_PORT, PS2_CMD_SEND_PORT2);
+        if (!ps2_wait_write()) return false;
+        outb(PS2_DATA_PORT, PS2_DEV_RESET);
+
+        if (!ps2_wait_read()) return false;
+        ack = inb(PS2_DATA_PORT);
+
+        if (ack == PS2_ACK)
+        {
+            if (!ps2_wait_read()) return false;
+            test_response = inb(PS2_DATA_PORT);
+
+            if (test_response != PS2_DEV_BAT_SUCCESS)
+            {
+                kprintf("   Port 2 BAT Fail: %x\n", test_response);
+                dual_channel = false;
+            }
+        }
+        else
+        {
+            kprintf("   Port 2 Expected ACK: %x\n", ack);
+            dual_channel = false;
+        }
+
+        if (!dual_channel)
+        {
+            kprintf("   Disabling Dual Channel");
+            if (!ps2_wait_write()) return false;
+            outb(PS2_COMMAND_PORT, PS2_CMD_DISABLE_PORT2);
+        }
+    }
+
+    // Enable keyboard scanning
     if (!ps2_wait_write()) return false;
     outb(PS2_DATA_PORT, PS2_ENABLE_KEYBOARD_SCANNING);
     if (ps2_wait_read()) {
@@ -205,6 +347,19 @@ bool ps2_init() {
     ioapic_set_irq(PS2_IRQ_KEYBOARD, 0, IDT_VECTOR_PS2_KEYBOARD);
     if (dual_channel) ioapic_set_irq(PS2_IRQ_MOUSE, 0, IDT_VECTOR_PS2_MOUSE);
 
+    // Enable IRQ
+    config |= PS2_CONFIG_PORT1_INT;
+    if (dual_channel)
+    {
+        config |= PS2_CONFIG_PORT2_INT;
+    }
+
+    if (!ps2_wait_write()) return false;
+    outb(PS2_COMMAND_PORT, PS2_CMD_WRITE_CONFIG);
+    if (!ps2_wait_write()) return false;
+    outb(PS2_DATA_PORT, config);
+
+    kprintf("Done.\n");
     return true;
 }
 
