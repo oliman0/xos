@@ -25,6 +25,7 @@
 #define PAGE_UC            (PAGE_CACHE_DISABLE | PAGE_WRITE_THROUGH)
 
 #define IA32_PAT_MSR       0x277
+#define PAT_SLOT_WC        1ULL
 
 #define PAT_TYPE_UC        0x00ULL
 #define PAT_TYPE_WC        0x01ULL
@@ -35,8 +36,6 @@
 
 #define PAT_MASK(slot)           (0xFFULL << ((slot) * 8))
 #define PAT_ENTRY(slot, type)    ((uint64_t)(type) << ((slot) * 8))
-
-#define PAT_SLOT_WC 2
 
 #define PML4_GET_INDEX(addr) (((addr) >> 39) & 0x1FF)
 #define PDPT_GET_INDEX(addr) (((addr) >> 30) & 0x1FF)

@@ -299,7 +299,7 @@ void vmm_init()
 {
     uint64_t pat = rdmsr(IA32_PAT_MSR);
 
-    // Set PAT slot 2 Write Combining
+    // Set PAT slot PAT_SLOT_WC Write Combining
     pat &= ~PAT_MASK(PAT_SLOT_WC);
     pat |= PAT_ENTRY(PAT_SLOT_WC, PAT_TYPE_WC);
 
