@@ -38,6 +38,7 @@ typedef enum
 #define ACPI_FADT_PM1_SLP_TYP_SHIFT  10
 #define ACPI_FADT_PM1_SLP_EN         (1 << 13)
 #define ACPI_FADT_S5_SLP_TYP_DEFAULT 5
+#define ACPI_FADT_IAPC_8042_FLAG (1 << 1)
 
 #define AML_OP_PACKAGE          0x12
 #define AML_OP_BYTE_PREFIX      0x0A

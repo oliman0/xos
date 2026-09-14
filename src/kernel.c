@@ -60,14 +60,9 @@ void kernel_main(uint64_t multiboot2_info_addr)
 
     lapic_timer_start_periodic(1000, ticks_per_ms, IDT_VECTOR_TIMER);
 
-    kprintf("Initializing PS/2 Driver... ");
-    if (ps2_init())
+    if (!ps2_init())
     {
-        kprintf("Done.\n");
-    }
-    else
-    {
-        kprintf("Failed.\n");
+        kprintf("Failed to initialise PS/2.\n");
     }
 
     kprintf("Kernel Booted.\n");
