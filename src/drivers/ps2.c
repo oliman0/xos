@@ -124,8 +124,6 @@ static void keyboard_irq_handler(registers_t* regs) {
 
         if (!(status & PS2_STATUS_OUTPUT_FULL)) break;
 
-        if (status & PS2_STATUS_AUX_DATA) break;
-
         uint8_t scancode = inb(PS2_DATA_PORT);
         spsc_ring_buffer_push(ring_buffer, &scancode);
     }
@@ -139,8 +137,6 @@ static void mouse_irq_handler(registers_t* regs) {
         uint8_t status = inb(PS2_STATUS_PORT);
 
         if (!(status & PS2_STATUS_OUTPUT_FULL)) break;
-
-        if (!(status & PS2_STATUS_AUX_DATA)) break;
 
         uint8_t data = inb(PS2_DATA_PORT);
     }
@@ -202,10 +198,13 @@ bool ps2_init()
     if (!ps2_wait_read()) return false;
     uint8_t config = inb(PS2_DATA_PORT);
 
-    // Configure port 1 and write config byte
+    // Configure ports and write config byte
     config |= PS2_CONFIG_TRANSLATION;
     config &= ~PS2_CONFIG_PORT1_INT;
     config &= ~PS2_CONFIG_PORT1_CLK;
+
+    config &= ~PS2_CONFIG_PORT2_INT;
+    config |= PS2_CONFIG_PORT2_CLK;
 
     if (!ps2_wait_write()) return false;
     outb(PS2_COMMAND_PORT, PS2_CMD_WRITE_CONFIG);
@@ -224,21 +223,13 @@ bool ps2_init()
 
     dual_channel = !(config & PS2_CONFIG_PORT2_CLK);
 
+    if (!ps2_wait_write()) return false;
+    outb(PS2_COMMAND_PORT, PS2_CMD_DISABLE_PORT2);
+
     // If dual channel disable port 2 then write config byte
     if (dual_channel)
     {
         kprintf("   Dual Channel\n");
-
-        if (!ps2_wait_write()) return false;
-        outb(PS2_COMMAND_PORT, PS2_CMD_DISABLE_PORT2);
-
-        config &= ~PS2_CONFIG_PORT2_INT;
-        config &= ~PS2_CONFIG_PORT2_CLK;
-
-        if (!ps2_wait_write()) return false;
-        outb(PS2_COMMAND_PORT, PS2_CMD_WRITE_CONFIG);
-        if (!ps2_wait_write()) return false;
-        outb(PS2_DATA_PORT, config);
     }
 
     // Test PS/2 port 1
@@ -326,7 +317,7 @@ bool ps2_init()
 
         if (!dual_channel)
         {
-            kprintf("   Disabling Dual Channel");
+            kprintf("   Disabling Dual Channel\n");
             if (!ps2_wait_write()) return false;
             outb(PS2_COMMAND_PORT, PS2_CMD_DISABLE_PORT2);
         }
@@ -347,17 +338,30 @@ bool ps2_init()
     ioapic_set_irq(PS2_IRQ_KEYBOARD, 0, IDT_VECTOR_PS2_KEYBOARD);
     if (dual_channel) ioapic_set_irq(PS2_IRQ_MOUSE, 0, IDT_VECTOR_PS2_MOUSE);
 
-    // Enable IRQ
+    // Enable IRQ & CLK then write the final config
     config |= PS2_CONFIG_PORT1_INT;
     if (dual_channel)
     {
         config |= PS2_CONFIG_PORT2_INT;
+        config &= ~PS2_CONFIG_PORT2_CLK;
     }
+    else 
+    {
+        config |= PS2_CONFIG_PORT2_CLK;
+        config &= ~PS2_CONFIG_PORT2_INT;
+    }
+
+    kprintf("   Config: %b\n", config);
 
     if (!ps2_wait_write()) return false;
     outb(PS2_COMMAND_PORT, PS2_CMD_WRITE_CONFIG);
     if (!ps2_wait_write()) return false;
     outb(PS2_DATA_PORT, config);
+
+    // Flush output buffer
+    while (inb(PS2_STATUS_PORT) & PS2_STATUS_OUTPUT_FULL) {
+        inb(PS2_DATA_PORT);
+    }
 
     kprintf("Done.\n");
     return true;
