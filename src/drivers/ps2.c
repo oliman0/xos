@@ -335,8 +335,8 @@ bool ps2_init()
     if (dual_channel) idt_register_interrupt_handler(IDT_VECTOR_PS2_MOUSE, mouse_irq_handler);
 
     // Configure IOAPIC
-    ioapic_set_irq(PS2_IRQ_KEYBOARD, 0, IDT_VECTOR_PS2_KEYBOARD);
-    if (dual_channel) ioapic_set_irq(PS2_IRQ_MOUSE, 0, IDT_VECTOR_PS2_MOUSE);
+    ioapic_set_irq(PS2_IRQ_KEYBOARD, lapic_get_id(), IDT_VECTOR_PS2_KEYBOARD);
+    if (dual_channel) ioapic_set_irq(PS2_IRQ_MOUSE, lapic_get_id(), IDT_VECTOR_PS2_MOUSE);
 
     // Enable IRQ & CLK then write the final config
     config |= PS2_CONFIG_PORT1_INT;
@@ -350,8 +350,6 @@ bool ps2_init()
         config |= PS2_CONFIG_PORT2_CLK;
         config &= ~PS2_CONFIG_PORT2_INT;
     }
-
-    kprintf("   Config: %b\n", config);
 
     if (!ps2_wait_write()) return false;
     outb(PS2_COMMAND_PORT, PS2_CMD_WRITE_CONFIG);

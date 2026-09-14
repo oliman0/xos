@@ -162,3 +162,10 @@ uint64_t lapic_ms_to_ticks(uint64_t ms)
 {
     return ms * (timer_frequency_hz / 1000);
 }
+
+uint8_t lapic_get_id()
+{
+    uint32_t lapic_id_reg = mmio_read32(lapic_base, LAPIC_ID_REG);
+
+    return (uint8_t)(lapic_id_reg >> 24);
+}
