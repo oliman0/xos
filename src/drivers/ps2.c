@@ -124,6 +124,8 @@ static void keyboard_irq_handler(registers_t* regs) {
 
         if (!(status & PS2_STATUS_OUTPUT_FULL)) break;
 
+        if (status & PS2_STATUS_AUX_DATA) break;
+
         uint8_t scancode = inb(PS2_DATA_PORT);
         spsc_ring_buffer_push(ring_buffer, &scancode);
     }
@@ -137,6 +139,8 @@ static void mouse_irq_handler(registers_t* regs) {
         uint8_t status = inb(PS2_STATUS_PORT);
 
         if (!(status & PS2_STATUS_OUTPUT_FULL)) break;
+
+        if (!(status & PS2_STATUS_AUX_DATA)) break;
 
         uint8_t data = inb(PS2_DATA_PORT);
     }
